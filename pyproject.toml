@@ -1,0 +1,24 @@
+[project]
+name = "dark-vessel-tracker"
+version = "0.1.0"
+description = "Detect dark fishing vessels by correlating AIS tracking data with Sentinel-1 SAR imagery."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Geospatial
+    "geopandas>=0.14",
+    "rasterio>=1.3",
+    "shapely>=2.0",
+    "sentinelsat>=1.2",
+    # Data science
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scikit-image>=0.22",
+    # Config
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.0",
+]

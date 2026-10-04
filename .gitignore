@@ -1,7 +1,18 @@
+# Data and model artifacts (large / regenerable)
 data/
 models/
+
+# Python
+.venv/
 __pycache__/
-*.env
+*.py[cod]
+
+# Jupyter
 .ipynb_checkpoints/
 
-.idea
+# Secrets
+.env
+*.env
+
+# IDE
+.idea/
