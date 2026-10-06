@@ -38,59 +38,53 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
 
     <div id="panel-body" class="panel-body min-h-0 flex-1 overflow-y-auto">
       <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="px-4 pb-4">
-        <details class="sec">
-          <summary><span class="sec-title">Show</span><span id="sum-metric" class="sec-value">Boats</span><span class="chev" aria-hidden="true">▾</span></summary>
-          <fieldset id="metric-group" class="sec-body">
-            <legend class="sr-only">Colour hexagons by</legend>
-            <div class="grid grid-cols-3 gap-1">
-              <label class="seg seg-radio"><input type="radio" name="metric" value="on_posidonia" checked class="sr-only" />Boats</label>
-              <label class="seg seg-radio"><input type="radio" name="metric" value="large_on_posidonia" class="sr-only" />Large</label>
-              <label class="seg seg-radio"><input type="radio" name="metric" value="density" class="sr-only" />Density</label>
-            </div>
-          </fieldset>
-        </details>
-
-        <details class="sec">
-          <summary><span class="sec-title">Year</span><span id="sum-year" class="sec-value">All</span><span class="chev" aria-hidden="true">▾</span></summary>
-          <div class="sec-body">
-            <div id="year-group" class="grid grid-cols-4 gap-1" role="group" aria-label="Year">
-              {['ALL', ...years].map((y) => (
-                <button type="button" data-year={y} aria-pressed={y === 'ALL' ? 'true' : 'false'} class="seg">{y === 'ALL' ? 'All' : y}</button>
-              ))}
-            </div>
-          </div>
-        </details>
-
-        <details class="sec">
-          <summary><span class="sec-title">Months</span><span id="time-label" class="sec-value" aria-live="polite">All</span><span class="chev" aria-hidden="true">▾</span></summary>
-          <div class="sec-body">
-            <div id="timeline" class="timeline" aria-label="Months: drag across the bars, or use the arrow keys (Shift to extend, Esc to reset)"></div>
-            <div class="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
-              <span>Drag to pick months</span>
-              <button type="button" id="time-reset" hidden class="text-sea underline">Show all</button>
-            </div>
-          </div>
-        </details>
-
-        <details class="sec">
-          <summary><span class="sec-title">Season</span><span id="sum-season" class="sec-value">All</span><span class="chev" aria-hidden="true">▾</span></summary>
-          <div class="sec-body">
-            <div class="grid grid-cols-5 gap-1" id="season-group" role="group" aria-label="Season">
-              {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
-                <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
-                  title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
-                  {{ ALL: 'All', DJF: 'Win', MAM: 'Spr', JJA: 'Sum', SON: 'Aut' }[s]}
-                </button>
-              ))}
-            </div>
-          </div>
-        </details>
-
         <details class="sec" open>
-          <summary><span class="sec-title">Legend</span><span class="sec-value"></span><span class="chev" aria-hidden="true">▾</span></summary>
-          <div class="sec-body">
-            <h2 class="mb-3 text-sm font-medium leading-snug text-ink" id="legend-title">Legend</h2>
-            <div id="legend" class="space-y-1.5 tabular text-xs text-ink-2"></div>
+          <summary><span class="sec-title">Legend</span><span id="sum-metric" class="sec-value">Boats</span><span class="chev" aria-hidden="true">▾</span></summary>
+          <div class="sec-body space-y-4">
+            <fieldset id="metric-group">
+              <legend class="sr-only">Colour hexagons by</legend>
+              <div class="grid grid-cols-3 gap-1">
+                <label class="seg seg-radio"><input type="radio" name="metric" value="on_posidonia" checked class="sr-only" />Boats</label>
+                <label class="seg seg-radio"><input type="radio" name="metric" value="large_on_posidonia" class="sr-only" />Large</label>
+                <label class="seg seg-radio"><input type="radio" name="metric" value="density" class="sr-only" />Density</label>
+              </div>
+            </fieldset>
+            <div>
+              <h2 class="mb-3 text-sm font-medium leading-snug text-ink" id="legend-title">Legend</h2>
+              <div id="legend" class="space-y-1.5 tabular text-xs text-ink-2"></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="sec">
+          <summary><span class="sec-title">Time</span><span id="sum-time" class="sec-value" aria-live="polite">All</span><span class="chev" aria-hidden="true">▾</span></summary>
+          <div class="sec-body space-y-4">
+            <div>
+              <h3 class="sub">Year</h3>
+              <div id="year-group" class="grid grid-cols-4 gap-1" role="group" aria-label="Year">
+                {['ALL', ...years].map((y) => (
+                  <button type="button" data-year={y} aria-pressed={y === 'ALL' ? 'true' : 'false'} class="seg">{y === 'ALL' ? 'All' : y}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div class="flex items-baseline justify-between gap-2">
+                <h3 class="sub">Months</h3>
+                <button type="button" id="time-reset" hidden class="text-xs text-sea underline">Show all</button>
+              </div>
+              <div id="timeline" class="timeline" aria-label="Months: drag across the bars, or use the arrow keys (Shift to extend, Esc to reset)"></div>
+            </div>
+            <div>
+              <h3 class="sub">Season</h3>
+              <div class="grid grid-cols-5 gap-1" id="season-group" role="group" aria-label="Season">
+                {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
+                  <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
+                    title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
+                    {{ ALL: 'All', DJF: 'Win', MAM: 'Spr', JJA: 'Sum', SON: 'Aut' }[s]}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </details>
 
@@ -209,6 +203,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .sec summary:hover .sec-title { color: var(--ink); }
   .sec-value { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 0.8125rem; color: var(--ink); }
   .sec-body { padding-bottom: 1rem; }
+  .sub { margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--muted); }
   .chev { font-size: 0.7rem; color: var(--muted); transition: transform 0.15s; }
   .sec[open] .chev { transform: rotate(180deg); }
   #metric-group:disabled { opacity: 0.55; }

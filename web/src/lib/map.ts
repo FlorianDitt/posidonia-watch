@@ -643,9 +643,9 @@ export async function initMap() {
       if (b.dataset.year !== 'ALL') b.disabled = monthly === null;
     });
     $('sum-metric').textContent = METRIC_SHORT[state.metric];
-    $('sum-year').textContent = year === 'ALL' ? 'All' : year ?? 'Custom range';
-    $('time-label').textContent = state.range === null ? 'All' : rangeLabel();
-    $('sum-season').textContent = state.season === 'ALL' ? 'All' : SEASON_LABEL[state.season];
+    const when = year === 'ALL' ? 'All' : year ?? rangeLabel();
+    $('sum-time').textContent = state.season === 'ALL' ? when
+      : year === 'ALL' ? `${SEASON_LABEL[state.season].split(' ')[0]} only` : `${when}, ${seasonWord(state.season)} only`;
     $('time-reset').hidden = state.range === null;
   }
 
