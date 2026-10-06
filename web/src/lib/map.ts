@@ -27,8 +27,10 @@ const POINTS_MINZOOM = 11;
 /** Below this zoom hexes are drawn as centroid dots. */
 const DOTS_MAXZOOM = 7;
 const ATTRIBUTION =
-  'Detections <a href="https://globalfishingwatch.org/" target="_blank" rel="noopener">Global Fishing Watch</a> (CC0) · ' +
-  'Seagrass <a href="https://emodnet.ec.europa.eu/en/seabed-habitats" target="_blank" rel="noopener">EMODnet</a> (CC-BY 4.0)';
+  'Detections <a href="https://globalfishingwatch.org/" target="_blank" rel="noopener">Global Fishing Watch</a> (CC0), ' +
+  'contains modified Copernicus Sentinel data · ' +
+  'Seagrass <a href="https://emodnet.ec.europa.eu/en/seabed-habitats" target="_blank" rel="noopener">EMODnet</a> (CC BY 4.0) · ' +
+  'EEZ <a href="https://www.marineregions.org/" target="_blank" rel="noopener">Marine Regions</a> (CC BY 4.0)';
 
 const METRIC_LABEL: Record<Metric, (largeLen: number) => string> = {
   on_posidonia: () => 'Boats seen anchored on seagrass',
