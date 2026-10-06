@@ -58,17 +58,17 @@ const path = Astro.url.pathname;
     <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-surface focus:px-3 focus:py-2">Skip to content</a>
     <header class="z-20 shrink-0 border-b border-line bg-surface/95 backdrop-blur">
       <div class:list={['mx-auto flex h-14 items-center gap-4 px-4', app ? 'max-w-none' : 'max-w-5xl']}>
-        <a href={withBase('/')} class="flex items-center gap-2 font-semibold tracking-tight text-ink">
+        <a href={withBase('/')} class="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold tracking-tight text-ink">
           <img src={withBase('favicon.svg')} alt="" width="26" height="26" />
           <span>posidonia<span class="text-seagrass">-watch</span></span>
         </a>
-        <nav aria-label="Main" class="ml-auto flex items-center gap-1 text-sm">
+        <nav aria-label="Main" class="ml-auto flex items-center gap-0.5 text-sm sm:gap-1">
           {nav.map((n) => (
             <a
               href={n.href}
               aria-current={n.match(path) ? 'page' : undefined}
               class:list={[
-                'rounded-md px-3 py-1.5 transition-colors',
+                'rounded-md px-2.5 py-1.5 transition-colors sm:px-3',
                 n.match(path) ? 'bg-seagrass-soft text-ink font-medium' : 'text-ink-2 hover:bg-surface-2 hover:text-ink',
               ]}
             >{n.label}</a>

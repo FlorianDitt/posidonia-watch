@@ -29,7 +29,8 @@ function niceStep(max: number, count: number): number {
   const raw = max / Math.max(1, count);
   const pow = 10 ** Math.floor(Math.log10(raw));
   const n = raw / pow;
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * pow;
+  // counts: avoid 2.5-steps so tick labels stay integers
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
 }
 
 export function niceMax(max: number, count = 4): number {
@@ -75,14 +76,16 @@ export function lineChart(container: HTMLElement, opts: ChartOptions): () => voi
     }
     // x ticks: January of each year (or first month), plus quarters when the range is short
     const short = n <= 15 && !opts.compact;
+    const firstJan = opts.months.findIndex((q) => q.endsWith('-01'));
     opts.months.forEach((mo, i) => {
       const isJan = mo.endsWith('-01');
       const isQuarter = ['-04', '-07', '-10'].some((q) => mo.endsWith(q));
       if (!(isJan || i === 0 || (short && isQuarter))) return;
-      if (i === 0 && !isJan && n > 1 && opts.months.findIndex((q) => q.endsWith('-01')) < 3 && opts.months.findIndex((q) => q.endsWith('-01')) >= 0) return;
-      const label = isJan || i === 0 ? (short ? fmtMonth(mo) : mo.slice(0, 4)) : fmtMonth(mo).slice(0, 3);
+      // a non-January first month gets its own label only if it doesn't collide with the first year tick
+      if (i === 0 && !isJan && firstJan > 0 && x(firstJan) - x(0) < (opts.compact ? 70 : 80)) return;
+      const label = isJan ? (short ? fmtMonth(mo) : mo.slice(0, 4)) : i === 0 ? fmtMonth(mo) : fmtMonth(mo).slice(0, 3);
       parts.push(`<line x1="${x(i)}" x2="${x(i)}" y1="${height - m.bottom}" y2="${height - m.bottom + 4}" stroke="var(--muted)"/>`);
-      parts.push(`<text x="${x(i)}" y="${height - m.bottom + 16}" text-anchor="middle" fill="var(--muted)" font-size="11">${escapeHtml(label)}</text>`);
+      parts.push(`<text x="${x(i)}" y="${height - m.bottom + 16}" text-anchor="${i === 0 ? 'start' : 'middle'}" fill="var(--muted)" font-size="11">${escapeHtml(label)}</text>`);
     });
     parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${height - m.bottom}" y2="${height - m.bottom}" stroke="var(--muted)" stroke-width="1"/>`);
     // lines
