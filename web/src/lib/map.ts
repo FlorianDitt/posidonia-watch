@@ -29,10 +29,10 @@ const ATTRIBUTION =
   'Detections <a href="https://globalfishingwatch.org/" target="_blank" rel="noopener">Global Fishing Watch</a> (CC0) · ' +
   'Seagrass <a href="https://emodnet.ec.europa.eu/en/seabed-habitats" target="_blank" rel="noopener">EMODnet</a> (CC-BY 4.0)';
 
-const METRIC_LABEL: Record<Metric, string> = {
-  density: 'Boats on Posidonia per clear image',
-  on_posidonia: 'Detections anchored on Posidonia',
-  large_on_posidonia: 'Large vessels on Posidonia',
+const METRIC_LABEL: Record<Metric, (largeLen: number) => string> = {
+  on_posidonia: () => 'Boats seen anchored on seagrass',
+  large_on_posidonia: (l) => `Boats ≥ ${l} m anchored on seagrass`,
+  density: () => 'Boats on seagrass per clear satellite image',
 };
 
 /** Fetch the basemap style; if OpenFreeMap is unreachable, fall back to a plain background so our data still renders. */
@@ -69,7 +69,7 @@ interface State {
   month: number | null;
 }
 
-const state: State = { metric: 'density', season: 'ALL', showPosidonia: true, showPoints: true, month: null };
+const state: State = { metric: 'on_posidonia', season: 'ALL', showPosidonia: true, showPoints: true, month: null };
 
 let meta: Meta | null = null;
 let hexes: Hexes | null = null;
@@ -187,7 +187,7 @@ function renderLegend() {
   const title = $('legend-title');
   const key = activeKey();
   const isCount = key !== 'density';
-  title.textContent = state.season === 'ALL' ? METRIC_LABEL[state.metric] : `On Posidonia, ${SEASON_LABEL[state.season as Season].toLowerCase()}`;
+  title.textContent = state.season === 'ALL' ? METRIC_LABEL[state.metric](largeLen) : `Boats on seagrass, ${SEASON_LABEL[state.season as Season].toLowerCase()}`;
   const vals = activeValues().filter((x) => Number.isFinite(x) && x > 0);
   if (!hexes || vals.length === 0) {
     el.innerHTML = '<p class="text-muted">No values to show.</p>';
@@ -209,8 +209,8 @@ function renderLegend() {
     rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm" style="background:${pick(k)}"></span><span>${range}</span></div>`);
   }
   rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${key === 'density' ? ' or no clear image' : ''}</span></div>`);
-  rows.push('<p class="pt-1 text-muted">Classes are quantiles of non-zero cells.</p>');
   el.innerHTML = rows.join('');
+  el.title = 'Classes are quantiles of non-zero cells';
 }
 
 // ---------- popups ----------
@@ -218,6 +218,7 @@ function renderLegend() {
 function seasonBars(i: number): string {
   if (!hexes?.by_season) return '';
   const vals = SEASONS.map((s) => hexes!.by_season[s]?.[i] ?? 0);
+  if (vals.filter((v) => v > 0).length < 2) return '';
   const max = Math.max(1, ...vals);
   const bars = SEASONS.map((s, k) => {
     const h = Math.round((vals[k] / max) * 36);
@@ -233,15 +234,14 @@ function hexPopupHtml(i: number): string {
   const h = hexes!;
   const row = (label: string, value: string) => `<tr><th class="py-0.5 pr-3 text-left font-normal text-muted">${label}</th><td class="py-0.5 text-right tabular font-medium">${value}</td></tr>`;
   const d = h.density?.[i];
-  return `<div class="w-56 text-xs">
-    <div class="text-sm font-semibold">${escapeHtml(countryName(h.country?.[i]))}</div>
-    <div class="mb-1.5 font-mono text-[10px] text-muted">H3 ${escapeHtml(h.h3[i])}</div>
+  return `<div class="w-52 text-xs" title="H3 ${escapeHtml(h.h3[i])}">
+    <div class="text-muted">${escapeHtml(countryName(h.country?.[i]))}</div>
+    <div class="mt-1 text-2xl font-semibold leading-none tabular">${fmtInt(h.on_posidonia?.[i])}</div>
+    <div class="mb-3 mt-1 text-ink-2">boats anchored on seagrass</div>
     <table class="w-full">
-      ${row('Anchored on Posidonia', fmtInt(h.on_posidonia?.[i]))}
-      ${row(`Large (≥ ${largeLen} m)`, fmtInt(h.large_on_posidonia?.[i]))}
-      ${row('Clear overpasses', fmtInt(h.clear_overpasses?.[i]))}
-      ${row('Density', d == null ? 'n/a' : `${fmtNum(d, 3)} <span class="font-normal text-muted">/image</span>`)}
-      ${row('Posidonia area', `${fmtNum(h.posidonia_km2?.[i], 2)} km²`)}
+      ${row(`≥ ${largeLen} m`, fmtInt(h.large_on_posidonia?.[i]))}
+      ${row('Per clear image', d == null ? 'n/a' : fmtNum(d, 2))}
+      ${row('Seagrass here', `${fmtNum(h.posidonia_km2?.[i], 1)} km²`)}
     </table>
     ${seasonBars(i)}
   </div>`;
