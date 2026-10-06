@@ -1,0 +1,102 @@
+---
+import '../styles/global.css';
+import { withBase, fmtDate } from '../lib/data';
+import { readMeta, isFixture } from '../lib/buildMeta';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Map page: full-viewport app layout, footer content moves into the map UI. */
+  app?: boolean;
+}
+
+const {
+  title,
+  description = 'Mapping boats anchored on protected Posidonia oceanica seagrass meadows across the Mediterranean, from Sentinel-2 satellite vessel detections and EMODnet seagrass maps.',
+  app = false,
+} = Astro.props;
+
+const siteName = 'posidonia-watch';
+const fullTitle = title ? `${title} · ${siteName}` : `${siteName} – boats anchored on Mediterranean seagrass`;
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL(withBase('og-image.png'), Astro.site).href;
+const meta = readMeta();
+const fixture = isFixture(meta);
+const repo = 'https://github.com/FlorianDitt/posidonia-watch';
+
+const nav = [
+  { href: withBase('/'), label: 'Map', match: (p: string) => p === withBase('/') },
+  { href: withBase('trends/'), label: 'Trends', match: (p: string) => p.startsWith(withBase('trends')) },
+  { href: withBase('about/'), label: 'About', match: (p: string) => p.startsWith(withBase('about')) },
+];
+const path = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={withBase('favicon.svg')} />
+    <meta name="theme-color" content="#f6f7f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d1719" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <slot name="head" />
+  </head>
+  <body class:list={['antialiased', app ? 'h-dvh overflow-hidden flex flex-col' : 'min-h-dvh flex flex-col']}>
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-surface focus:px-3 focus:py-2">Skip to content</a>
+    <header class="z-20 shrink-0 border-b border-line bg-surface/95 backdrop-blur">
+      <div class:list={['mx-auto flex h-14 items-center gap-4 px-4', app ? 'max-w-none' : 'max-w-5xl']}>
+        <a href={withBase('/')} class="flex items-center gap-2 font-semibold tracking-tight text-ink">
+          <img src={withBase('favicon.svg')} alt="" width="26" height="26" />
+          <span>posidonia<span class="text-seagrass">-watch</span></span>
+        </a>
+        <nav aria-label="Main" class="ml-auto flex items-center gap-1 text-sm">
+          {nav.map((n) => (
+            <a
+              href={n.href}
+              aria-current={n.match(path) ? 'page' : undefined}
+              class:list={[
+                'rounded-md px-3 py-1.5 transition-colors',
+                n.match(path) ? 'bg-seagrass-soft text-ink font-medium' : 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+              ]}
+            >{n.label}</a>
+          ))}
+          <a href={repo} class="ml-1 hidden rounded-md px-3 py-1.5 text-ink-2 hover:bg-surface-2 hover:text-ink sm:inline" rel="noopener">GitHub</a>
+        </nav>
+      </div>
+    </header>
+    {fixture && (
+      <div role="note" class="shrink-0 bg-amber-100 px-4 py-1 text-center text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        Showing <strong>synthetic sample data</strong> for development – not real detections.
+      </div>
+    )}
+    <main id="main" class:list={[app ? 'relative min-h-0 flex-1' : 'flex-1']}>
+      <slot />
+    </main>
+    {!app && (
+      <footer class="mt-16 border-t border-line bg-surface">
+        <div class="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-6 text-xs text-muted sm:flex-row sm:items-start sm:justify-between">
+          <p class="max-w-2xl leading-relaxed">
+            Vessel detections: <a class="underline" href="https://globalfishingwatch.org/" rel="noopener">Global Fishing Watch</a> (CC0).
+            Seagrass: <a class="underline" href="https://emodnet.ec.europa.eu/en/seabed-habitats" rel="noopener">EMODnet Seabed Habitats</a> (CC-BY 4.0).
+            Basemap: <a class="underline" href="https://openfreemap.org/" rel="noopener">OpenFreeMap</a> © <a class="underline" href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a> contributors.
+            Code: <a class="underline" href={repo} rel="noopener">MIT</a>.
+          </p>
+          <p class="shrink-0 tabular">Data updated {meta ? fmtDate(meta.generated_at) : '–'}</p>
+        </div>
+      </footer>
+    )}
+  </body>
+</html>
