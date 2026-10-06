@@ -5,7 +5,7 @@ import type * as GeoJSON from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 // MapLibre v6 runs its tiles in a module worker; let Vite bundle it and tell MapLibre where it is.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import { cellToBoundary } from 'h3-js';
+import { cellToBoundary, cellToLatLng } from 'h3-js';
 import {
   loadJson, fmtInt, fmtNum, fmtMonth, escapeHtml, withBase,
   SEASONS, SEASON_LABEL,
@@ -23,6 +23,8 @@ const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/positron';
 const STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const POSIDONIA_MINZOOM = 8;
 const POINTS_MINZOOM = 11;
+/** Below this zoom hexes are drawn as centroid dots. */
+const DOTS_MAXZOOM = 7;
 const ATTRIBUTION =
   'Detections <a href="https://globalfishingwatch.org/" target="_blank" rel="noopener">Global Fishing Watch</a> (CC0) · ' +
   'Seagrass <a href="https://emodnet.ec.europa.eu/en/seabed-habitats" target="_blank" rel="noopener">EMODnet</a> (CC-BY 4.0)';
@@ -32,6 +34,26 @@ const METRIC_LABEL: Record<Metric, string> = {
   on_posidonia: 'Detections anchored on Posidonia',
   large_on_posidonia: 'Large vessels on Posidonia',
 };
+
+/** Fetch the basemap style; if OpenFreeMap is unreachable, fall back to a plain background so our data still renders. */
+async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
+  const url = isDark() ? STYLE_DARK : STYLE_LIGHT;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as maplibregl.StyleSpecification;
+  } catch (e) {
+    console.warn('Basemap unavailable, using plain background', e);
+    return {
+      version: 8,
+      sources: {},
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': isDark() ? '#16252a' : '#dfe8ea' } }],
+    };
+  }
+}
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -53,6 +75,7 @@ let meta: Meta | null = null;
 let hexes: Hexes | null = null;
 let hexIndex = new Map<string, number>();
 let hexGeojson: GeoJSON.FeatureCollection | null = null;
+let hexCentroids: GeoJSON.FeatureCollection | null = null;
 let pointsGeojson: GeoJSON.FeatureCollection | null = null;
 let posidoniaGeojson: GeoJSON.FeatureCollection | null = null;
 let pointsLoading = false;
@@ -146,6 +169,19 @@ function fillColorExpr(): ExpressionSpecification {
   ] as unknown as ExpressionSpecification;
 }
 
+function dotPaint() {
+  const key = activeKey();
+  const positive = ['>', ['coalesce', ['to-number', ['get', key]], 0], 0];
+  return {
+    'circle-color': fillColorExpr(),
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, ['case', positive, 3, 1.5], DOTS_MAXZOOM, ['case', positive, 6, 3]],
+    'circle-stroke-color': cssVar('--hex-line'),
+    'circle-stroke-width': 0.5,
+    'circle-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
+    'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
+  } as unknown as NonNullable<maplibregl.CircleLayerSpecification['paint']>;
+}
+
 function renderLegend() {
   const el = $('legend');
   const title = $('legend-title');
@@ -236,16 +272,27 @@ export async function initMap() {
     hexes = hx;
     hexIndex = new Map(hx.h3.map((id, i) => [id, i]));
     hexGeojson = buildHexGeojson(hx);
+    // Res-7 hexes are only a few pixels wide at Mediterranean scale, so the overview uses centroid dots.
+    hexCentroids = {
+      type: 'FeatureCollection',
+      features: hexGeojson.features.map((f) => {
+        const [lat, lon] = cellToLatLng(hx.h3[f.properties!.i as number]);
+        return { type: 'Feature', id: f.id, properties: f.properties, geometry: { type: 'Point', coordinates: [lon, lat] } };
+      }),
+    };
   }
+
+  currentBreaks = quantileBreaks(activeValues(), activeKey() !== 'density');
+  renderLegend();
 
   const bbox = (meta?.bbox && meta.bbox.length === 4 ? meta.bbox : MED_BBOX) as [number, number, number, number];
   let map: maplibregl.Map;
   try {
     map = new maplibregl.Map({
       container: 'map',
-      style: isDark() ? STYLE_DARK : STYLE_LIGHT,
+      style: await basemapStyle(),
       bounds: [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
-      fitBoundsOptions: { padding: 20 },
+      fitBoundsOptions: { padding: window.innerWidth >= 640 ? { top: 20, bottom: 20, left: 340, right: 20 } : { top: 10, bottom: 60, left: 10, right: 10 } },
       attributionControl: false,
       maxZoom: 16,
       dragRotate: false,
@@ -289,17 +336,29 @@ export async function initMap() {
       map.addSource('hexes', { type: 'geojson', data: hexGeojson });
       map.addLayer({
         id: 'hex-fill', type: 'fill', source: 'hexes',
+        minzoom: DOTS_MAXZOOM - 1.5,
         paint: {
           'fill-color': fillColorExpr(),
-          'fill-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.85, 10, 0.7, 12, 0.25],
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1.5, 0, DOTS_MAXZOOM, 0.85, 10, 0.7, 12, 0.25],
         },
       }, before);
       map.addLayer({
         id: 'hex-line', type: 'line', source: 'hexes',
         paint: {
           'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], cssVar('--ink'), cssVar('--hex-line')],
-          'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2, ['interpolate', ['linear'], ['zoom'], 5, 0, 8, 0.5, 12, 1]],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0],
+            8, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0.5],
+            12, ['case', ['boolean', ['feature-state', 'hover'], false], 2.5, 1]],
         },
+      }, before);
+    }
+    if (hexCentroids && !map.getSource('hex-centroids')) {
+      map.addSource('hex-centroids', { type: 'geojson', data: hexCentroids });
+      map.addLayer({
+        id: 'hex-dots', type: 'circle', source: 'hex-centroids', maxzoom: DOTS_MAXZOOM,
+        layout: { 'circle-sort-key': ['to-number', ['get', activeKey()]] },
+        paint: dotPaint(),
       }, before);
     }
     if (!map.getSource('points')) {
@@ -328,6 +387,11 @@ export async function initMap() {
 
   function refreshHexColors() {
     if (map.getLayer('hex-fill')) map.setPaintProperty('hex-fill', 'fill-color', fillColorExpr());
+    if (map.getLayer('hex-dots')) {
+      map.setPaintProperty('hex-dots', 'circle-color', fillColorExpr());
+      map.setPaintProperty('hex-dots', 'circle-radius', dotPaint()['circle-radius']);
+      map.setLayoutProperty('hex-dots', 'circle-sort-key', ['to-number', ['get', activeKey()]]);
+    }
     else currentBreaks = quantileBreaks(activeValues(), activeKey() !== 'density');
     renderLegend();
   }
@@ -369,8 +433,8 @@ export async function initMap() {
   map.on('moveend', () => { ensurePosidonia(); ensurePoints(); });
 
   // Follow OS theme changes: swap basemap, then re-add our layers (style.load).
-  darkQuery.addEventListener('change', () => {
-    map.setStyle(isDark() ? STYLE_DARK : STYLE_LIGHT, { diff: false });
+  darkQuery.addEventListener('change', async () => {
+    map.setStyle(await basemapStyle(), { diff: false });
   });
 
   // ----- hover & click -----
@@ -384,10 +448,10 @@ export async function initMap() {
   }
 
   map.on('mousemove', (e) => {
-    const layers = ['points', 'hex-fill'].filter((l) => map.getLayer(l));
+    const layers = ['points', 'hex-fill', 'hex-dots'].filter((l) => map.getLayer(l));
     const feats = layers.length ? map.queryRenderedFeatures(e.point, { layers }) : [];
     const pt = feats.find((f) => f.layer.id === 'points');
-    const hx = feats.find((f) => f.layer.id === 'hex-fill');
+    const hx = feats.find((f) => f.layer.id === 'hex-fill' || f.layer.id === 'hex-dots');
     map.getCanvas().style.cursor = pt || hx ? 'pointer' : '';
     setHover(hx ? (hx.id as number) : null);
     if (!canHover) return;
@@ -402,10 +466,10 @@ export async function initMap() {
   map.getCanvas().addEventListener('mouseleave', () => { setHover(null); hover.remove(); });
 
   map.on('click', (e) => {
-    const layers = ['points', 'hex-fill'].filter((l) => map.getLayer(l));
+    const layers = ['points', 'hex-fill', 'hex-dots'].filter((l) => map.getLayer(l));
     const feats = layers.length ? map.queryRenderedFeatures(e.point, { layers }) : [];
     const pt = feats.find((f) => f.layer.id === 'points');
-    const hx = feats.find((f) => f.layer.id === 'hex-fill');
+    const hx = feats.find((f) => f.layer.id === 'hex-fill' || f.layer.id === 'hex-dots');
     hover.remove();
     if (pt) {
       popup.setLngLat((pt.geometry as GeoJSON.Point).coordinates as [number, number]).setHTML(pointPopupHtml(pt)).addTo(map);
@@ -487,7 +551,7 @@ export async function initMap() {
       <li><button type="button" data-k="${k}" class="hs flex w-full items-start gap-3 rounded-md px-2 py-2 text-left hover:bg-surface-2">
         <span class="mt-0.5 w-5 shrink-0 text-right text-xs tabular text-muted">${k + 1}</span>
         <span class="min-w-0 flex-1">
-          <span class="block truncate font-medium text-ink">${escapeHtml(h.place ?? `${fmtNum(h.lat, 2)}° N, ${fmtNum(h.lon, 2)}° E`)}</span>
+          <span class="block truncate font-medium text-ink">${escapeHtml(h.place ?? `${fmtNum(Math.abs(h.lat), 2)}° ${h.lat >= 0 ? 'N' : 'S'}, ${fmtNum(Math.abs(h.lon), 2)}° ${h.lon >= 0 ? 'E' : 'W'}`)}</span>
           <span class="block text-xs text-muted">${escapeHtml(countryName(h.country))} · peak ${escapeHtml(fmtMonth(h.peak_month))}</span>
         </span>
         <span class="shrink-0 text-right tabular">
@@ -500,7 +564,7 @@ export async function initMap() {
       if (!btn) return;
       const h = hs[Number(btn.dataset.k)];
       if (isNarrow()) setOpen(false);
-      map.flyTo({ center: [h.lon, h.lat], zoom: 11.5, essential: true });
+      map.flyTo({ center: [h.lon, h.lat], zoom: 11.5, essential: true, padding: isNarrow() ? 0 : { left: 340, top: 0, right: 0, bottom: 0 } });
       const i = hexIndex.get(h.h3);
       if (i !== undefined) {
         map.once('moveend', () => {
@@ -511,5 +575,4 @@ export async function initMap() {
     });
   }
 
-  if (!hexes) renderLegend();
 }

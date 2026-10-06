@@ -155,3 +155,12 @@ body {
   /* keep attribution/scale above the collapsed bottom sheet */
   .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 52px; }
 }
+/* MapLibre controls in dark mode */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .maplibregl-ctrl-group,
+  :root:not([data-theme="light"]) .maplibregl-ctrl-attrib,
+  :root:not([data-theme="light"]) .maplibregl-ctrl-scale { background: rgba(20, 34, 37, 0.9) !important; color: var(--ink-2); border-color: var(--ink-2); }
+  :root:not([data-theme="light"]) .maplibregl-ctrl-attrib a { color: var(--ink-2); }
+  :root:not([data-theme="light"]) .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+  :root:not([data-theme="light"]) .maplibregl-ctrl-group button + button { border-top-color: var(--line); }
+}
