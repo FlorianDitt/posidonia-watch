@@ -37,7 +37,8 @@ JSON is minified, UTF-8.
   "params": { "speed_kn_max": 1.0, "posidonia_buffer_m": 20, "large_length_m": 24 },
   "sources": [
     { "name": "GFW Sentinel-2 vessel detections", "license": "CC0-1.0", "url": "https://zenodo.org/records/..." },
-    { "name": "EMODnet Seabed Habitats – seagrass EOV 2025", "license": "CC-BY-4.0", "url": "https://emodnet.ec.europa.eu/en/seabed-habitats" }
+    { "name": "EMODnet Seabed Habitats – Seagrass cover (EOV), version 2025", "license": "CC-BY-4.0", "url": "https://emodnet.ec.europa.eu/geonetwork/srv/eng/catalog.search#/metadata/39746d9c-4220-425c-bc26-7cb3056c36a5" },
+    { "name": "Flanders Marine Institute – Maritime Boundaries Geodatabase (EEZ), version 12", "license": "CC-BY-4.0", "url": "https://doi.org/10.14284/632" }
   ],
   "bbox": [-6.0, 30.0, 36.5, 46.0]
 }

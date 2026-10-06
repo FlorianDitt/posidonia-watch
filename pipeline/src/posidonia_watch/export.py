@@ -57,10 +57,11 @@ def meta_obj(months: list[str], cfg, gfw_url: str) -> dict:
         },
         "sources": [
             {"name": "GFW Sentinel-2 vessel detections", "license": "CC0-1.0", "url": gfw_url},
-            {"name": "EMODnet Seabed Habitats – seagrass EOV 2025", "license": "CC-BY-4.0",
-             "url": "https://emodnet.ec.europa.eu/en/seabed-habitats"},
-            {"name": "Marine Regions – Maritime Boundaries (EEZ) v12", "license": "CC-BY-4.0",
-             "url": "https://www.marineregions.org/"},
+            {"name": "EMODnet Seabed Habitats – Seagrass cover (EOV), version 2025", "license": "CC-BY-4.0",
+             "url": "https://emodnet.ec.europa.eu/geonetwork/srv/eng/catalog.search#/metadata/"
+                    "39746d9c-4220-425c-bc26-7cb3056c36a5"},
+            {"name": "Flanders Marine Institute – Maritime Boundaries Geodatabase (EEZ), version 12", "license": "CC-BY-4.0",
+             "url": "https://doi.org/10.14284/632"},
         ],
         "bbox": list(cfg.bbox),
     }
