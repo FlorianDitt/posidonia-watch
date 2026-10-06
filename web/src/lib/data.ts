@@ -43,6 +43,9 @@ export interface Hexes {
   density: (number | null)[];
   posidonia_km2: number[];
   by_season: Record<Season, number[]>;
+  /** Missing in data built before seasonal large/density support. */
+  by_season_large?: Record<Season, number[]>;
+  by_season_clear_overpasses?: Record<Season, number[]>;
 }
 
 export interface Points {

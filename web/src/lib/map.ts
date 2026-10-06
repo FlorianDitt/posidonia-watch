@@ -102,7 +102,7 @@ function buildHexGeojson(h: Hexes): GeoJSON.FeatureCollection {
       on_posidonia: h.on_posidonia?.[i] ?? 0,
       large_on_posidonia: h.large_on_posidonia?.[i] ?? 0,
     };
-    for (const s of SEASONS) props[`s_${s}`] = h.by_season?.[s]?.[i] ?? 0;
+    for (const s of SEASONS) for (const m of METRICS) props[`${m}_${s}`] = seasonalValues(h, m, s)[i] ?? 0;
     features.push({ type: 'Feature', id: i, properties: props, geometry: { type: 'Polygon', coordinates: [ring] } });
   }
   return { type: 'FeatureCollection', features };
@@ -133,13 +133,43 @@ function quantileBreaks(values: number[], isCount: boolean): number[] {
   return out.filter((b) => b > v[0]);
 }
 
+const METRICS: Metric[] = ['on_posidonia', 'large_on_posidonia', 'density'];
+
+/** Data built before seasonal large/density support only has seasonal boat counts. */
+const hasSeasonalMetrics = (h: Hexes | null) => !!h?.by_season_large && !!h?.by_season_clear_overpasses;
+
+const seasonalCache = new Map<string, number[]>();
+function seasonalValues(h: Hexes, metric: Metric, s: Season): number[] {
+  const k = `${metric}_${s}`;
+  let v = seasonalCache.get(k);
+  if (v) return v;
+  const on = h.by_season?.[s] ?? [];
+  if (!hasSeasonalMetrics(h) || metric === 'on_posidonia') v = on;
+  else if (metric === 'large_on_posidonia') v = h.by_season_large![s] ?? [];
+  else {
+    const clear = h.by_season_clear_overpasses![s] ?? [];
+    v = on.map((n, i) => (clear[i] > 0 ? n / clear[i] : NaN));
+  }
+  seasonalCache.set(k, v);
+  return v;
+}
+
+/** The metric actually shown: old data falls back to boat counts for single seasons. */
+function activeMetric(): Metric {
+  return state.season !== 'ALL' && !hasSeasonalMetrics(hexes) ? 'on_posidonia' : state.metric;
+}
+
 function activeKey(): string {
-  return state.season === 'ALL' ? state.metric : `s_${state.season}`;
+  return state.season === 'ALL' ? state.metric : `${activeMetric()}_${state.season}`;
+}
+
+function activeIsCount(): boolean {
+  return activeMetric() !== 'density';
 }
 
 function activeValues(): number[] {
   if (!hexes) return [];
-  if (state.season !== 'ALL') return hexes.by_season?.[state.season] ?? [];
+  if (state.season !== 'ALL') return seasonalValues(hexes, activeMetric(), state.season);
   return (hexes[state.metric] ?? []).map((x) => (x == null ? NaN : x));
 }
 
@@ -153,7 +183,7 @@ let currentBreaks: number[] = [];
 
 function fillColorExpr(): ExpressionSpecification {
   const key = activeKey();
-  const isCount = key !== 'density';
+  const isCount = activeIsCount();
   currentBreaks = quantileBreaks(activeValues(), isCount);
   const colors = ramp();
   // map N breaks onto N+1 colours spread over the 5-step ramp
@@ -186,8 +216,9 @@ function renderLegend() {
   const el = $('legend');
   const title = $('legend-title');
   const key = activeKey();
-  const isCount = key !== 'density';
-  title.textContent = state.season === 'ALL' ? METRIC_LABEL[state.metric](largeLen) : `Boats on seagrass, ${SEASON_LABEL[state.season as Season].toLowerCase()}`;
+  const isCount = activeIsCount();
+  const label = METRIC_LABEL[activeMetric()](largeLen);
+  title.textContent = state.season === 'ALL' ? label : `${label}, ${SEASON_LABEL[state.season as Season].toLowerCase()}`;
   const vals = activeValues().filter((x) => Number.isFinite(x) && x > 0);
   if (!hexes || vals.length === 0) {
     el.innerHTML = '<p class="text-muted">No values to show.</p>';
@@ -207,7 +238,7 @@ function renderLegend() {
     const range = f(lo) === f(top) ? f(lo) : `${f(lo)} – ${f(top)}`;
     rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm" style="background:${pick(k)}"></span><span>${range}</span></div>`);
   }
-  rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${key === 'density' ? ' or no clear image' : ''}</span></div>`);
+  rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`);
   el.innerHTML = rows.join('');
   el.title = 'Classes are quantiles of non-zero cells';
 }
@@ -281,7 +312,7 @@ export async function initMap() {
     };
   }
 
-  currentBreaks = quantileBreaks(activeValues(), activeKey() !== 'density');
+  currentBreaks = quantileBreaks(activeValues(), activeIsCount());
   renderLegend();
 
   const bbox = (meta?.bbox && meta.bbox.length === 4 ? meta.bbox : MED_BBOX) as [number, number, number, number];
@@ -391,7 +422,7 @@ export async function initMap() {
       map.setPaintProperty('hex-dots', 'circle-radius', dotPaint()['circle-radius']);
       map.setLayoutProperty('hex-dots', 'circle-sort-key', ['to-number', ['get', activeKey()]]);
     }
-    else currentBreaks = quantileBreaks(activeValues(), activeKey() !== 'density');
+    else currentBreaks = quantileBreaks(activeValues(), activeIsCount());
     renderLegend();
   }
 
@@ -515,7 +546,7 @@ export async function initMap() {
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
     state.season = b.dataset.season as SeasonSel;
     seasonButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    ($('metric-group') as HTMLFieldSetElement).disabled = state.season !== 'ALL';
+    ($('metric-group') as HTMLFieldSetElement).disabled = state.season !== 'ALL' && !hasSeasonalMetrics(hexes);
     $('season-note').classList.toggle('hidden', state.season === 'ALL');
     refreshHexColors();
   }));
