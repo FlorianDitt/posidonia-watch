@@ -224,12 +224,14 @@ function writeValues() {
 
 const seasonWord = (s: Season) => SEASON_LABEL[s].split(' ')[0].toLowerCase();
 
-function periodLabel(): string {
+function rangeLabel(): string {
   const r = state.range;
   const m = (c: number) => fmtMonth(calendar[c]?.month);
-  let out = r === null ? 'All months' : r[0] === r[1] ? m(r[0]) : `${m(r[0])} – ${m(r[1])}`;
-  if (state.season !== 'ALL') out += `, ${seasonWord(state.season)} only`;
-  return out;
+  return r === null ? 'All months' : r[0] === r[1] ? m(r[0]) : `${m(r[0])} – ${m(r[1])}`;
+}
+
+function periodLabel(): string {
+  return state.season === 'ALL' ? rangeLabel() : `${rangeLabel()}, ${seasonWord(state.season)} only`;
 }
 
 function ramp(): string[] {
@@ -615,13 +617,14 @@ export async function initMap() {
     });
   }
 
-  function renderTimeLabel() {
-    const first = calendar[0]?.month;
-    const last = calendar.at(-1)?.month;
-    $('time-label').innerHTML = state.range === null && state.season === 'ALL'
-      ? `All months <span class="text-muted">· ${escapeHtml(fmtMonth(first))} – ${escapeHtml(fmtMonth(last))}</span>`
-      : escapeHtml(periodLabel());
-    $('time-reset').hidden = state.range === null && state.season === 'ALL';
+  const METRIC_SHORT: Record<Metric, string> = { on_posidonia: 'Boats', large_on_posidonia: `Boats ≥ ${largeLen} m`, density: 'Density' };
+
+  /** Section headers show the current value, so a collapsed section still tells what is filtered. */
+  function renderSummaries() {
+    $('sum-metric').textContent = METRIC_SHORT[state.metric];
+    $('time-label').textContent = state.range === null ? 'All' : rangeLabel();
+    $('sum-season').textContent = state.season === 'ALL' ? 'All' : SEASON_LABEL[state.season];
+    $('time-reset').hidden = state.range === null;
   }
 
   /** Re-render everything that depends on metric, range or season. */
@@ -632,7 +635,7 @@ export async function initMap() {
     timeline.setRange(state.range);
     timeline.setActive((c) => calendar[c].idx >= 0 && (state.season === 'ALL' || seasonOf(calendar[c].month) === state.season));
     timeline.setValues(timelineValues());
-    renderTimeLabel();
+    renderSummaries();
     if (pinnedHex !== null) popup.setHTML(hexPopupHtml(pinnedHex));
   }
 
@@ -644,7 +647,6 @@ export async function initMap() {
   }));
   $('time-reset').addEventListener('click', () => {
     state.range = null;
-    state.season = 'ALL';
     update();
   });
   update();

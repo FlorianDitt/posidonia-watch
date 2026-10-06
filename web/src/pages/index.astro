@@ -36,58 +36,67 @@ const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
     </div>
 
     <div id="panel-body" class="panel-body min-h-0 flex-1 overflow-y-auto">
-      <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="space-y-6 p-4">
-        <fieldset id="metric-group">
-          <legend class="sr-only">Colour hexagons by</legend>
-          <div class="grid grid-cols-3 gap-1">
-            <label class="seg seg-radio"><input type="radio" name="metric" value="on_posidonia" checked class="sr-only" />Boats</label>
-            <label class="seg seg-radio"><input type="radio" name="metric" value="large_on_posidonia" class="sr-only" />Large</label>
-            <label class="seg seg-radio"><input type="radio" name="metric" value="density" class="sr-only" />Density</label>
-          </div>
-        </fieldset>
+      <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="px-4 pb-4">
+        <details class="sec">
+          <summary><span class="sec-title">Show</span><span id="sum-metric" class="sec-value">Boats</span><span class="chev" aria-hidden="true">▾</span></summary>
+          <fieldset id="metric-group" class="sec-body">
+            <legend class="sr-only">Colour hexagons by</legend>
+            <div class="grid grid-cols-3 gap-1">
+              <label class="seg seg-radio"><input type="radio" name="metric" value="on_posidonia" checked class="sr-only" />Boats</label>
+              <label class="seg seg-radio"><input type="radio" name="metric" value="large_on_posidonia" class="sr-only" />Large</label>
+              <label class="seg seg-radio"><input type="radio" name="metric" value="density" class="sr-only" />Density</label>
+            </div>
+          </fieldset>
+        </details>
 
-        <section aria-labelledby="time-heading">
-          <h2 id="time-heading" class="sr-only">Time</h2>
-          <div class="mb-2 flex items-baseline justify-between gap-2">
-            <p id="time-label" class="min-w-0 truncate text-sm text-ink" aria-live="polite">All months</p>
-            <button type="button" id="time-reset" hidden class="shrink-0 text-xs text-sea underline">Show all</button>
-          </div>
-          <div id="timeline" class="timeline" aria-label="Months: drag across the bars, or use the arrow keys (Shift to extend, Esc to reset)"></div>
-          <div class="mt-3 grid grid-cols-5 gap-1" id="season-group" role="group" aria-label="Season">
-            {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
-              <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
-                title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
-                {{ ALL: 'All', DJF: 'Win', MAM: 'Spr', JJA: 'Sum', SON: 'Aut' }[s]}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <div>
-          <h2 class="mb-3 text-sm font-medium leading-snug text-ink" id="legend-title">Legend</h2>
-          <div id="legend" class="space-y-1.5 tabular text-xs text-ink-2"></div>
-        </div>
-
-        <details class="more border-t border-line pt-4">
-          <summary class="flex cursor-pointer list-none items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted hover:text-ink">
-            Map layers <span class="chev" aria-hidden="true">▾</span>
-          </summary>
-
-          <div class="mt-4">
-            <fieldset class="space-y-3">
-              <legend class="sr-only">Show on map</legend>
-              <label class="flex items-center gap-2"><input type="checkbox" id="toggle-posidonia" checked class="accent-[var(--seagrass)]" />
-                <span class="inline-block h-3 w-4 rounded-sm border border-seagrass bg-seagrass/30"></span>
-                <span>Seagrass meadows</span></label>
-              <label class="flex items-center gap-2"><input type="checkbox" id="toggle-points" checked class="accent-[var(--sea)]" />
-                <span class="inline-flex w-4 items-center justify-center gap-0.5"><span class="inline-block h-1.5 w-1.5 rounded-full" style="background:var(--point-small)"></span><span class="inline-block h-2.5 w-2.5 rounded-full" style="background:var(--point-large)"></span></span>
-                <span>Single boats <span class="text-xs text-muted">(big dot ≥ {large} m)</span></span></label>
-              <p class="text-xs text-muted">Zoom in to see meadows and single boats.</p>
-            </fieldset>
+        <details class="sec">
+          <summary><span class="sec-title">Months</span><span id="time-label" class="sec-value" aria-live="polite">All</span><span class="chev" aria-hidden="true">▾</span></summary>
+          <div class="sec-body">
+            <div id="timeline" class="timeline" aria-label="Months: drag across the bars, or use the arrow keys (Shift to extend, Esc to reset)"></div>
+            <div class="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
+              <span>Drag to pick months</span>
+              <button type="button" id="time-reset" hidden class="text-sea underline">Show all</button>
+            </div>
           </div>
         </details>
 
-        <p class="text-xs leading-relaxed text-muted">
+        <details class="sec">
+          <summary><span class="sec-title">Season</span><span id="sum-season" class="sec-value">All</span><span class="chev" aria-hidden="true">▾</span></summary>
+          <div class="sec-body">
+            <div class="grid grid-cols-5 gap-1" id="season-group" role="group" aria-label="Season">
+              {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
+                <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
+                  title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
+                  {{ ALL: 'All', DJF: 'Win', MAM: 'Spr', JJA: 'Sum', SON: 'Aut' }[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </details>
+
+        <details class="sec" open>
+          <summary><span class="sec-title">Legend</span><span class="sec-value"></span><span class="chev" aria-hidden="true">▾</span></summary>
+          <div class="sec-body">
+            <h2 class="mb-3 text-sm font-medium leading-snug text-ink" id="legend-title">Legend</h2>
+            <div id="legend" class="space-y-1.5 tabular text-xs text-ink-2"></div>
+          </div>
+        </details>
+
+        <details class="sec">
+          <summary><span class="sec-title">Map layers</span><span class="sec-value"></span><span class="chev" aria-hidden="true">▾</span></summary>
+          <fieldset class="sec-body space-y-3">
+            <legend class="sr-only">Show on map</legend>
+            <label class="flex items-center gap-2"><input type="checkbox" id="toggle-posidonia" checked class="accent-[var(--seagrass)]" />
+              <span class="inline-block h-3 w-4 rounded-sm border border-seagrass bg-seagrass/30"></span>
+              <span>Seagrass meadows</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="toggle-points" checked class="accent-[var(--sea)]" />
+              <span class="inline-flex w-4 items-center justify-center gap-0.5"><span class="inline-block h-1.5 w-1.5 rounded-full" style="background:var(--point-small)"></span><span class="inline-block h-2.5 w-2.5 rounded-full" style="background:var(--point-large)"></span></span>
+              <span>Single boats <span class="text-xs text-muted">(big dot ≥ {large} m)</span></span></label>
+            <p class="text-xs text-muted">Zoom in to see meadows and single boats.</p>
+          </fieldset>
+        </details>
+
+        <p class="pt-4 text-xs leading-relaxed text-muted">
           Shows anchoring pressure, not proven violations.{' '}
           <a class="text-sea underline" href={withBase('about/')}>How this works</a>
           <span class="mt-1 block tabular">Updated {meta ? fmtDate(meta.generated_at) : '–'}</span>
@@ -172,9 +181,24 @@ const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
   }
   .timeline :global(.tl-axis) { position: relative; height: 1rem; margin-top: 0.25rem; font-size: 10px; color: var(--muted); }
   .timeline :global(.tl-axis span) { position: absolute; top: 0; line-height: 1rem; white-space: nowrap; }
-  .more summary::-webkit-details-marker { display: none; }
-  .more[open] .chev { transform: rotate(180deg); }
-  .chev { transition: transform 0.15s; }
+  /* Collapsible panel sections; several can be open at once. */
+  .sec { border-bottom: 1px solid var(--line); }
+  .sec summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.8rem 0;
+    cursor: pointer;
+    list-style: none;
+  }
+  .sec summary::-webkit-details-marker { display: none; }
+  .sec summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 0.25rem; }
+  .sec-title { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .sec summary:hover .sec-title { color: var(--ink); }
+  .sec-value { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 0.8125rem; color: var(--ink); }
+  .sec-body { padding-bottom: 1rem; }
+  .chev { font-size: 0.7rem; color: var(--muted); transition: transform 0.15s; }
+  .sec[open] .chev { transform: rotate(180deg); }
   #metric-group:disabled { opacity: 0.55; }
   .when-open { display: none; }
   .panel[data-open='true'] .when-open { display: inline; }
