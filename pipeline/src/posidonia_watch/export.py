@@ -89,6 +89,8 @@ def hexes_obj(hexes: pd.DataFrame) -> dict:
         "density": [_num(v, 4) for v in hexes["density"]],
         "posidonia_km2": [_num(v, 3) for v in hexes["posidonia_km2"]],
         "by_season": {s: [int(v) for v in hexes[s]] for s in SEASONS},
+        "by_season_large": {s: [int(v) for v in hexes[f"large_{s}"]] for s in SEASONS},
+        "by_season_clear_overpasses": {s: [int(v) for v in hexes[f"clear_{s}"]] for s in SEASONS},
     }
 
 
@@ -206,9 +208,10 @@ def validate_outputs(out_dir: Path) -> None:
     m = len(hx["h3"])
     for k in keys:
         _check(len(hx[k]) == m, f"hexes.{k} length")
-    _check(set(hx["by_season"]) == set(SEASONS), "hexes.by_season keys")
-    for s in SEASONS:
-        _check(len(hx["by_season"][s]) == m, f"hexes.by_season.{s} length")
+    for key in ("by_season", "by_season_large", "by_season_clear_overpasses"):
+        _check(set(hx[key]) == set(SEASONS), f"hexes.{key} keys")
+        for s in SEASONS:
+            _check(len(hx[key][s]) == m, f"hexes.{key}.{s} length")
     _check(all(h3.is_valid_cell(c) and h3.get_resolution(c) == meta["h3_resolution"] for c in hx["h3"][:1000]), "hexes.h3 cells")
     for d, c in zip(hx["density"], hx["clear_overpasses"]):
         _check((d is None) == (c == 0), "hexes.density must be null iff clear_overpasses == 0")

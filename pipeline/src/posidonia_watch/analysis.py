@@ -174,9 +174,17 @@ def aggregate_hexes(
     )
     hexes["density"] = density(hexes["on_posidonia"], hexes["clear_overpasses"])
     hexes["posidonia_km2"] = cells["posidonia_km2"]
-    seasons = on.assign(season=on["month"].map(season_of)).groupby(["h3", "season"]).size().unstack(fill_value=0)
+    on_s = on.assign(season=on["month"].map(season_of))
+    seasons = on_s.groupby(["h3", "season"]).size().unstack(fill_value=0)
+    seasons_large = on_s[on_s["large"]].groupby(["h3", "season"]).size().unstack(fill_value=0)
+    seasons_clear = (
+        ovp.assign(season=ovp["month"].map(season_of))
+        .groupby(["h3_id", "season"])["overpasses_cloud_under_20"].sum().unstack(fill_value=0)
+    )
     for s in SEASONS:
         hexes[s] = seasons[s].reindex(idx, fill_value=0) if s in seasons else 0
+        hexes[f"large_{s}"] = seasons_large[s].reindex(idx, fill_value=0) if s in seasons_large else 0
+        hexes[f"clear_{s}"] = seasons_clear[s].reindex(idx, fill_value=0).astype(int) if s in seasons_clear else 0
     by_month = on.groupby(["h3", "month"]).size()
     peak = by_month.reset_index(name="n").sort_values(["n", "month"], ascending=[False, False]).drop_duplicates("h3")
     hexes["peak_month"] = peak.set_index("h3")["month"].reindex(idx)

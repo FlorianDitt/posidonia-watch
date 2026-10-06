@@ -77,9 +77,16 @@ Posidonia, aggregated over **all months**. Compact columnar layout:
   "clear_overpasses":  [140],
   "density":           [0.0857],
   "posidonia_km2":     [1.9],
-  "by_season": { "DJF": [0], "MAM": [2], "JJA": [9], "SON": [1] }
+  "by_season": { "DJF": [0], "MAM": [2], "JJA": [9], "SON": [1] },
+  "by_season_large": { "DJF": [0], "MAM": [1], "JJA": [2], "SON": [0] },
+  "by_season_clear_overpasses": { "DJF": [30], "MAM": [38], "JJA": [44], "SON": [28] }
 }
 ```
+
+`by_season` is `on_posidonia` per meteorological season (all years),
+`by_season_large` likewise for `large_on_posidonia`, and
+`by_season_clear_overpasses` is `clear_overpasses` per season, so the web can
+compute seasonal density as `by_season / by_season_clear_overpasses`.
 
 All arrays have equal length. The web app builds polygons with `h3-js`.
 
