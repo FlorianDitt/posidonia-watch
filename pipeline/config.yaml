@@ -1,0 +1,70 @@
+# posidonia-watch pipeline configuration.
+# Thresholds are documented (with the evidence used to pick them) in README.md.
+
+methodology_version: "1"
+
+# Mediterranean bounding box [min_lon, min_lat, max_lon, max_lat]
+bbox: [-6.0, 30.0, 36.5, 46.0]
+# Parts of the bbox that are not Mediterranean (excluded from all counts).
+# [min_lon, min_lat, max_lon, max_lat]
+exclude_boxes:
+  - [-6.0, 30.0, -5.62, 46.0]   # Atlantic west of the Strait of Gibraltar
+  - [-6.0, 42.0, 1.0, 46.0]     # Bay of Biscay
+  - [27.3, 41.15, 36.5, 46.0]   # Black Sea
+
+h3_resolution: 7  # must match GFW's overpass grid (res 7)
+
+params:
+  speed_kn_max: 1.0          # anchored = inferred speed strictly below this
+  posidonia_buffer_m: 20     # buffer around Posidonia polygons (pixel/geolocation uncertainty)
+  large_length_m: 24         # French 2020 anchoring regulation threshold
+
+filters:
+  presence_score_min: 0.5    # GFW: probability the detection is a vessel
+  nonvessel_score_max: 0.5   # GFW: probability the detection is NOT a vessel (rock, wake, cloud...)
+  cloud_score_max: 0.5       # GFW: cloudiness around the detection
+  length_m_min: 0            # no lower length cut (10 m pixels already limit to >= ~10-15 m)
+  exclude_infrastructure: true
+  exclude_ice: true
+
+output:
+  dir: ../web/public/data
+  points_cap: 200000
+  hotspots_n: 50
+  posidonia_simplify_m: 30   # Douglas-Peucker tolerance for posidonia.geojson
+  coord_decimals: 5
+
+sources:
+  zenodo_concept_recid: "15978308"   # GFW "Vessel detections from Sentinel 2" (all versions)
+  zenodo_api: https://zenodo.org/api
+  # Fallback if Zenodo search is unavailable: period -> record id
+  fallback_records:
+    "2019": 15978309
+    "2020": 16361539
+    "2021": 16362301
+    "2022": 16363632
+    "2023": 16364665
+    "2024": 16366408
+    "202501": 16409068
+    "202502": 16410123
+    "202503": 16410409
+    "202504": 16410466
+    "202505": 16410525
+    "202506": 16410613
+    "202507": 16911647
+    "202508": 17964145
+    "202510": 18656831
+    "202511": 17988202
+    "202601": 18697070
+    "202602": 19112087
+    "202603": 19660647
+    "202604": 20286252
+    "202605": 20762421
+    "202606": 21441412
+    "202608": 22844774
+  emodnet_wfs: https://ows.emodnet-seabedhabitats.eu/geoserver/emodnet_open/wfs
+  emodnet_layer: emodnet_open:seagrass_eov_poly_2025
+  emodnet_filter: "habsubtype = 'Posidonia oceanica'"   # excludes 'Dead mattes of Posidonia oceanica'
+  eez_wfs: https://geo.vliz.be/geoserver/MarineRegions/wfs
+  eez_layer: MarineRegions:eez
+  eez_max_distance_m: 20000   # snap near-shore points that fall outside coarse EEZ polygons

@@ -1,0 +1,33 @@
+[project]
+name = "posidonia-watch"
+version = "0.1.0"
+description = "Pipeline: boats anchored on Posidonia oceanica seagrass, from GFW Sentinel-2 vessel detections"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "geopandas>=1.0",
+    "h3>=4.1",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "pyproj>=3.6",
+    "pyyaml>=6",
+    "requests>=2.32",
+    "shapely>=2.0",
+]
+
+[project.scripts]
+posidonia-watch = "posidonia_watch.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/posidonia_watch"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
