@@ -19,7 +19,8 @@ from .habitat import MED_LAEA
 
 log = logging.getLogger(__name__)
 
-FILES = ("meta.json", "timeseries.json", "hexes.json", "points.json", "posidonia.geojson", "hotspots.json")
+FILES = ("meta.json", "timeseries.json", "hexes.json", "hexes_monthly.json", "points.json", "posidonia.geojson",
+         "hotspots.json")
 
 
 def _num(x, nd: int | None = None):
@@ -91,6 +92,17 @@ def hexes_obj(hexes: pd.DataFrame) -> dict:
         "by_season": {s: [int(v) for v in hexes[s]] for s in SEASONS},
         "by_season_large": {s: [int(v) for v in hexes[f"large_{s}"]] for s in SEASONS},
         "by_season_clear_overpasses": {s: [int(v) for v in hexes[f"clear_{s}"]] for s in SEASONS},
+    }
+
+
+def hexes_monthly_obj(rows: pd.DataFrame, clear: np.ndarray, months: list[str]) -> dict:
+    return {
+        "months": months,
+        "cell": [int(v) for v in rows["i"]],
+        "month": [int(v) for v in rows["m"]],
+        "on_posidonia": [int(v) for v in rows["n"]],
+        "large_on_posidonia": [int(v) for v in rows["large"]],
+        "clear_overpasses": [int(v) for v in clear.reshape(-1)],
     }
 
 
@@ -215,6 +227,16 @@ def validate_outputs(out_dir: Path) -> None:
     _check(all(h3.is_valid_cell(c) and h3.get_resolution(c) == meta["h3_resolution"] for c in hx["h3"][:1000]), "hexes.h3 cells")
     for d, c in zip(hx["density"], hx["clear_overpasses"]):
         _check((d is None) == (c == 0), "hexes.density must be null iff clear_overpasses == 0")
+
+    hm = json.loads((out_dir / "hexes_monthly.json").read_text())
+    _check(hm["months"] == months, "hexes_monthly.months != meta.months")
+    r = len(hm["cell"])
+    for k in ("month", "on_posidonia", "large_on_posidonia"):
+        _check(len(hm[k]) == r, f"hexes_monthly.{k} length")
+    _check(all(0 <= i < m for i in hm["cell"]), "hexes_monthly.cell index out of range")
+    _check(all(0 <= k < n for k in hm["month"]), "hexes_monthly.month index out of range")
+    _check(len(hm["clear_overpasses"]) == m * n, "hexes_monthly.clear_overpasses must be cells x months")
+    _check(sum(hm["on_posidonia"]) == sum(hx["on_posidonia"]), "hexes_monthly.on_posidonia must sum to hexes total")
 
     pts = json.loads((out_dir / "points.json").read_text())
     p = len(pts["lon"])

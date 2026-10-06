@@ -90,6 +90,28 @@ compute seasonal density as `by_season / by_season_clear_overpasses`.
 
 All arrays have equal length. The web app builds polygons with `h3-js`.
 
+## `hexes_monthly.json`
+
+The same cells as `hexes.json`, split by month, so the web can aggregate any
+month range or season. `cell` indexes the arrays of `hexes.json`, `month`
+indexes `meta.months`.
+
+```json
+{
+  "months": ["2019-01", "..."],
+  "cell":               [0, 0, 7],
+  "month":              [3, 4, 4],
+  "on_posidonia":       [2, 5, 1],
+  "large_on_posidonia": [1, 2, 0],
+  "clear_overpasses":   [4, 3, 0, "..."]
+}
+```
+
+`cell`, `month`, `on_posidonia` and `large_on_posidonia` are sparse rows,
+only where `on_posidonia > 0`. `clear_overpasses` is dense, cell-major:
+the value for cell `i` and month `k` is at `i * len(months) + k`. Summing
+`on_posidonia` over all rows equals the total in `hexes.json`.
+
 ## `points.json`
 
 Individual anchored-on-Posidonia detections, for zoomed-in views.

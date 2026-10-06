@@ -192,6 +192,36 @@ def aggregate_hexes(
     return hexes.sort_values("h3").reset_index(drop=True)
 
 
+def hex_monthly(
+    anch: pd.DataFrame,
+    hex_ids: Sequence[str],
+    overpass: pd.DataFrame,
+    months: list[str],
+) -> tuple[pd.DataFrame, np.ndarray]:
+    """Per (cell, month) values, so the web can aggregate any month selection.
+
+    Returns sparse on-Posidonia counts (columns i, m, n, large; ``i`` indexes
+    ``hex_ids``, ``m`` indexes ``months``, only non-zero rows) and a dense
+    ``len(hex_ids) x len(months)`` matrix of clear overpasses.
+    """
+    pos = pd.Series(np.arange(len(hex_ids)), index=pd.Index(hex_ids))
+    midx = pd.Series(np.arange(len(months)), index=pd.Index(months))
+    on = anch[anch["on_posidonia"] & anch["month"].isin(months) & anch["h3"].isin(pos.index)]
+    rows = on.groupby(["h3", "month"]).agg(n=("large", "size"), large=("large", "sum")).reset_index()
+    rows = pd.DataFrame({
+        "i": pos.reindex(rows["h3"]).to_numpy(),
+        "m": midx.reindex(rows["month"]).to_numpy(),
+        "n": rows["n"].astype(int).to_numpy(),
+        "large": rows["large"].astype(int).to_numpy(),
+    }).sort_values(["i", "m"]).reset_index(drop=True)
+
+    clear = np.zeros((len(hex_ids), len(months)), dtype=np.int64)
+    ovp = overpass[overpass["month"].isin(months) & overpass["h3_id"].isin(pos.index)]
+    agg = ovp.groupby(["h3_id", "month"])["overpasses_cloud_under_20"].sum().reset_index()
+    clear[pos.reindex(agg["h3_id"]).to_numpy(), midx.reindex(agg["month"]).to_numpy()] = agg["overpasses_cloud_under_20"]
+    return rows, clear
+
+
 def hotspots(hexes: pd.DataFrame, n: int = 50) -> pd.DataFrame:
     h = hexes[hexes["on_posidonia"] > 0].copy()
     h["_d"] = h["density"].fillna(-1)

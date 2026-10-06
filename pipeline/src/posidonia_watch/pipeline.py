@@ -221,6 +221,7 @@ def build(cfg: Config) -> dict:
     totals = analysis.monthly_totals(anch, months)
     by_country = analysis.country_series(anch, months)
     hexes = analysis.aggregate_hexes(anch, cells[["h3", "country", "posidonia_km2"]], ovp, months)
+    monthly_rows, monthly_clear = analysis.hex_monthly(anch, hexes["h3"].tolist(), ovp, months)
     hot = analysis.hotspots(hexes, cfg.output.get("hotspots_n", 50))
 
     out = cfg.out_dir
@@ -230,6 +231,7 @@ def build(cfg: Config) -> dict:
     export.write_json(out / "meta.json", export.meta_obj(months, cfg, gfw_url))
     export.write_json(out / "timeseries.json", export.timeseries_obj(totals, by_country, names, months))
     export.write_json(out / "hexes.json", export.hexes_obj(hexes))
+    export.write_json(out / "hexes_monthly.json", export.hexes_monthly_obj(monthly_rows, monthly_clear, months))
     export.write_json(out / "points.json", export.points_obj(anch, months, cfg.output.get("points_cap", 200_000), nd))
     export.write_json(out / "hotspots.json", export.hotspots_obj(hot, nd))
     tol = export.write_posidonia_geojson(posidonia, out / "posidonia.geojson", cfg.output.get("posidonia_simplify_m", 30))
