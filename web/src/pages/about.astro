@@ -1,0 +1,108 @@
+---
+import Base from '../layouts/Base.astro';
+import { withBase, fmtDate, fmtMonth } from '../lib/data';
+import { readMeta, DEFAULT_PARAMS } from '../lib/buildMeta';
+
+const meta = readMeta();
+const p = { ...DEFAULT_PARAMS, ...(meta?.params ?? {}) };
+const res = meta?.h3_resolution ?? 7;
+// Approximate average H3 cell areas (km²) for the resolutions likely to be used.
+const h3Area: Record<number, string> = { 5: '~250 km²', 6: '~36 km²', 7: '~5 km²', 8: '~0.7 km²', 9: '~0.1 km²' };
+const months = meta?.months ?? [];
+const repo = 'https://github.com/FlorianDitt/posidonia-watch';
+const licenceUrl: Record<string, string> = {
+  'CC0-1.0': 'https://creativecommons.org/publicdomain/zero/1.0/',
+  'CC-BY-4.0': 'https://creativecommons.org/licenses/by/4.0/',
+};
+---
+
+<Base title="About & methodology" description="Why Posidonia matters, the data sources and licences, how anchored boats on seagrass are detected, and the limitations of the method.">
+  <article class="prose-pw mx-auto max-w-3xl px-4 pt-10">
+    <h1 class="text-3xl font-semibold tracking-tight text-ink">About this map</h1>
+    <p class="text-lg">
+      posidonia-watch maps where boats anchor on protected <strong><em>Posidonia oceanica</em></strong> seagrass meadows,
+      across the whole Mediterranean and month by month, using only free and open satellite data.
+    </p>
+
+    <h2>Why Posidonia matters</h2>
+    <p>
+      <em>Posidonia oceanica</em> is a seagrass found only in the Mediterranean. Its meadows shelter juvenile fish,
+      keep beaches from eroding, clear the water and store large amounts of carbon in the sediment beneath them.
+      It is also extremely slow: a meadow spreads by a few centimetres a year, so a scar left by an anchor and chain
+      can take decades to centuries to recover.
+    </p>
+    <p>
+      Anchoring is one of the main local pressures on these meadows, and it is concentrated in popular summer bays.
+      Several countries now restrict it – France, for example, bans anchoring on Posidonia for vessels of
+      {p.large_length_m} m and longer in many areas. Existing studies of anchoring pressure usually cover a single bay.
+      This project tries to give a consistent, Mediterranean-wide picture.
+    </p>
+
+    <h2>Data sources</h2>
+    <ul>
+      <li>
+        <strong>Vessel detections</strong> – <a href="https://globalfishingwatch.org/" rel="noopener">Global Fishing Watch</a>,
+        Sentinel-2 vessel detections (10 m optical imagery, ESA Copernicus). Licence
+        <a href={licenceUrl['CC0-1.0']} rel="noopener">CC0 1.0</a>; credit to Global Fishing Watch is appreciated.
+      </li>
+      <li>
+        <strong>Seagrass maps</strong> – <a href="https://emodnet.ec.europa.eu/en/seabed-habitats" rel="noopener">EMODnet Seabed Habitats</a>,
+        seagrass essential ocean variable (EOV) polygons 2025, filtered to <em>Posidonia oceanica</em>.
+        Licence <a href={licenceUrl['CC-BY-4.0']} rel="noopener">CC-BY 4.0</a>. The derived data on this site therefore also requires attribution to EMODnet.
+      </li>
+      <li>
+        <strong>Basemap</strong> – <a href="https://openfreemap.org/" rel="noopener">OpenFreeMap</a>, with map data
+        © <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap contributors</a> (ODbL).
+      </li>
+      <li><strong>Country attribution</strong> – exclusive economic zones from Marine Regions.</li>
+    </ul>
+    {meta?.sources?.length ? (
+      <p class="text-sm">
+        Exact inputs of the current release:
+        {meta.sources.map((s, i) => (
+          <span>{i > 0 ? '; ' : ' '}<a href={s.url} rel="noopener">{s.name}</a> ({s.license})</span>
+        ))}.
+      </p>
+    ) : null}
+
+    <h2>Method</h2>
+    <ol class="list-decimal space-y-2 pl-5 text-ink-2">
+      <li><strong>Detect.</strong> Every vessel Global Fishing Watch found in a Sentinel-2 image, with its estimated length and speed, is the starting point. Low-confidence detections, fixed infrastructure, ice and cloudy scenes are filtered out.</li>
+      <li><strong>Anchored.</strong> A detection counts as anchored when its inferred speed is below <strong>{p.speed_kn_max} kn</strong>.</li>
+      <li><strong>On Posidonia.</strong> An anchored detection counts as “on Posidonia” when it lies inside a mapped meadow, buffered by <strong>{p.posidonia_buffer_m} m</strong> to allow for position and pixel uncertainty.</li>
+      <li><strong>Large.</strong> Vessels with an estimated length of <strong>{p.large_length_m} m</strong> or more.</li>
+      <li><strong>Aggregate.</strong> Detections are counted per <a href="https://h3geo.org/" rel="noopener">H3</a> hexagon at resolution {res} ({h3Area[res] ?? 'see H3 docs'} per cell), per month and per country (EEZ).</li>
+      <li><strong>Normalise.</strong> A place that is often cloudy is seen less often. So the map's <em>density</em> divides the number of boats on Posidonia by the number of <strong>clear satellite overpasses</strong> (less than 20 % cloud) of that cell. It reads as “how many boats are anchored on Posidonia here, on average, at the moment a clear image is taken”.</li>
+    </ol>
+    <p>
+      Monthly totals on the <a href={withBase('trends/')}>Trends</a> page are raw counts and are not normalised for cloud cover.
+    </p>
+
+    <h2>Limitations</h2>
+    <ul>
+      <li><strong>Small boats are missed.</strong> With 10 m pixels, vessels shorter than roughly 10–15 m are detected unreliably or not at all. Most leisure boats are in that range, so the true number of anchored boats is much higher than shown.</li>
+      <li><strong>Moorings look like anchoring.</strong> A boat on a legal, eco-designed mooring buoy above a meadow looks the same from space as one dropping an anchor into it.</li>
+      <li><strong>Pressure, not proof.</strong> Detections are indicators of anchoring pressure, not evidence that any individual skipper broke a rule. Do not use this map to accuse individual vessels.</li>
+      <li><strong>Speed is inferred.</strong> Speed is estimated from the image (e.g. wakes), so slowly moving boats may be counted as anchored and vice versa.</li>
+      <li><strong>Seagrass maps are incomplete.</strong> EMODnet combines many surveys of different ages and precision; unmapped meadows are invisible here, and some polygons may include sand patches or dead matte.</li>
+      <li><strong>Snapshot sampling.</strong> Sentinel-2 passes every few days at around 10:30–11:00 local time; boats anchoring only overnight or in the afternoon are under-sampled.</li>
+    </ul>
+
+    <h2>This release</h2>
+    {meta ? (
+      <ul>
+        <li>Data generated: <strong>{fmtDate(meta.generated_at)}</strong> (methodology version {meta.methodology_version})</li>
+        {months.length > 0 && <li>Period covered: {fmtMonth(months[0])} – {fmtMonth(months[months.length - 1])} ({months.length} months)</li>}
+        <li>Parameters: speed &lt; {p.speed_kn_max} kn, Posidonia buffer {p.posidonia_buffer_m} m, large ≥ {p.large_length_m} m, H3 resolution {res}</li>
+      </ul>
+    ) : (
+      <p>No data has been published yet. Parameters above are the defaults.</p>
+    )}
+
+    <h2>Open source</h2>
+    <p>
+      Code (MIT), pipeline, data contract and issue tracker are on
+      <a href={repo} rel="noopener">GitHub</a>. Corrections and better seagrass data are very welcome.
+    </p>
+  </article>
+</Base>
