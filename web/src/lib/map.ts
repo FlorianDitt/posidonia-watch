@@ -203,9 +203,8 @@ function renderLegend() {
   for (let k = 0; k < nClasses; k++) {
     const lo = k === 0 ? min : currentBreaks[k - 1];
     const hi = k === nClasses - 1 ? max : currentBreaks[k];
-    const range = isCount
-      ? (k === nClasses - 1 ? `${f(lo)} – ${f(hi)}` : `${f(lo)} – ${f(Math.max(lo, hi - 1))}`)
-      : `${f(lo)} – ${f(hi)}`;
+    const top = isCount && k !== nClasses - 1 ? Math.max(lo, hi - 1) : hi;
+    const range = f(lo) === f(top) ? f(lo) : `${f(lo)} – ${f(top)}`;
     rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm" style="background:${pick(k)}"></span><span>${range}</span></div>`);
   }
   rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${key === 'density' ? ' or no clear image' : ''}</span></div>`);
