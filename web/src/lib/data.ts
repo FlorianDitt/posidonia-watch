@@ -10,6 +10,12 @@ export const SEASON_LABEL: Record<Season, string> = {
   SON: 'Autumn (Sep–Nov)',
 };
 
+/** "2025-08" -> "JJA" */
+export function seasonOf(month: string): Season {
+  const m = Number(month.slice(5, 7));
+  return m === 12 || m <= 2 ? 'DJF' : m <= 5 ? 'MAM' : m <= 8 ? 'JJA' : 'SON';
+}
+
 export interface Meta {
   generated_at: string;
   methodology_version: string;
@@ -46,6 +52,17 @@ export interface Hexes {
   /** Missing in data built before seasonal large/density support. */
   by_season_large?: Record<Season, number[]>;
   by_season_clear_overpasses?: Record<Season, number[]>;
+}
+
+/** Per (cell, month) values; see docs/data-contract.md. */
+export interface HexesMonthly {
+  months: string[];
+  cell: number[];
+  month: number[];
+  on_posidonia: number[];
+  large_on_posidonia: number[];
+  /** Dense, cell-major: cell i, month k at i * months.length + k. */
+  clear_overpasses: number[];
 }
 
 export interface Points {

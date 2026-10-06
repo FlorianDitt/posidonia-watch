@@ -46,6 +46,23 @@ const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
           </div>
         </fieldset>
 
+        <section aria-labelledby="time-heading">
+          <h2 id="time-heading" class="sr-only">Time</h2>
+          <div class="mb-2 flex items-baseline justify-between gap-2">
+            <p id="time-label" class="min-w-0 truncate text-sm text-ink" aria-live="polite">All months</p>
+            <button type="button" id="time-reset" hidden class="shrink-0 text-xs text-sea underline">Show all</button>
+          </div>
+          <div id="timeline" class="timeline" aria-label="Months: drag across the bars, or use the arrow keys (Shift to extend, Esc to reset)"></div>
+          <div class="mt-3 grid grid-cols-5 gap-1" id="season-group" role="group" aria-label="Season">
+            {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
+              <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
+                title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
+                {{ ALL: 'All', DJF: 'Win', MAM: 'Spr', JJA: 'Sum', SON: 'Aut' }[s]}
+              </button>
+            ))}
+          </div>
+        </section>
+
         <div>
           <h2 class="mb-3 text-sm font-medium leading-snug text-ink" id="legend-title">Legend</h2>
           <div id="legend" class="space-y-1.5 tabular text-xs text-ink-2"></div>
@@ -53,37 +70,18 @@ const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
 
         <details class="more border-t border-line pt-4">
           <summary class="flex cursor-pointer list-none items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted hover:text-ink">
-            More options <span class="chev" aria-hidden="true">▾</span>
+            Map layers <span class="chev" aria-hidden="true">▾</span>
           </summary>
 
-          <div class="mt-4 space-y-6">
-            <fieldset>
-              <legend class="mb-2 text-xs text-muted">Season</legend>
-              <div class="grid grid-cols-5 gap-1" id="season-group">
-                {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
-                  <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
-                    title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
-                    {{ ALL: 'All', DJF: 'Win', MAM: 'Spr', JJA: 'Sum', SON: 'Aut' }[s]}
-                  </button>
-                ))}
-              </div>
-              <p id="season-note" class="mt-2 hidden text-xs leading-relaxed text-muted">Totals for that season, all years combined.</p>
-            </fieldset>
-
+          <div class="mt-4">
             <fieldset class="space-y-3">
-              <legend class="mb-2 text-xs text-muted">Show on map</legend>
+              <legend class="sr-only">Show on map</legend>
               <label class="flex items-center gap-2"><input type="checkbox" id="toggle-posidonia" checked class="accent-[var(--seagrass)]" />
                 <span class="inline-block h-3 w-4 rounded-sm border border-seagrass bg-seagrass/30"></span>
                 <span>Seagrass meadows</span></label>
               <label class="flex items-center gap-2"><input type="checkbox" id="toggle-points" checked class="accent-[var(--sea)]" />
                 <span class="inline-flex w-4 items-center justify-center gap-0.5"><span class="inline-block h-1.5 w-1.5 rounded-full" style="background:var(--point-small)"></span><span class="inline-block h-2.5 w-2.5 rounded-full" style="background:var(--point-large)"></span></span>
                 <span>Single boats <span class="text-xs text-muted">(big dot ≥ {large} m)</span></span></label>
-              <label class="block pl-6">
-                <span class="sr-only">Month for single boats</span>
-                <select id="month-select" class="w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink">
-                  <option value="">All months</option>
-                </select>
-              </label>
               <p class="text-xs text-muted">Zoom in to see meadows and single boats.</p>
             </fieldset>
           </div>
@@ -147,6 +145,33 @@ const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
+  /* Timeline bars are rendered by src/lib/timeline.ts, hence :global() */
+  .timeline :global(.tl-bars) {
+    display: flex;
+    gap: 1px;
+    height: 2.75rem;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+    border-radius: 0.25rem;
+  }
+  .timeline :global(.tl-bars:focus-visible) { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .timeline :global(.tl-bars[aria-disabled]) { cursor: default; }
+  .timeline :global(.tl-bar) { display: flex; flex: 1 1 0; min-width: 0; align-items: flex-end; }
+  .timeline :global(.tl-bar span) {
+    display: block;
+    width: 100%;
+    border-radius: 1px 1px 0 0;
+    background: color-mix(in srgb, var(--muted) 40%, transparent);
+    transition: background-color 0.1s;
+  }
+  .timeline :global(.tl-bar.tl-on span) { background: var(--sea); }
+  .timeline :global(.tl-bar.tl-missing span) {
+    height: 2px;
+    background: repeating-linear-gradient(90deg, var(--line) 0 2px, transparent 2px 4px);
+  }
+  .timeline :global(.tl-axis) { position: relative; height: 1rem; margin-top: 0.25rem; font-size: 10px; color: var(--muted); }
+  .timeline :global(.tl-axis span) { position: absolute; top: 0; line-height: 1rem; white-space: nowrap; }
   .more summary::-webkit-details-marker { display: none; }
   .more[open] .chev { transform: rotate(180deg); }
   .chev { transition: transform 0.15s; }

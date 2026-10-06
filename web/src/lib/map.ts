@@ -8,10 +8,11 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { cellToBoundary, cellToLatLng } from 'h3-js';
 import {
   loadJson, fmtInt, fmtNum, fmtMonth, escapeHtml, withBase,
-  SEASONS, SEASON_LABEL,
-  type Meta, type Hexes, type Points, type Hotspot, type Timeseries, type Season,
+  SEASON_LABEL, seasonOf,
+  type Meta, type Hexes, type HexesMonthly, type Points, type Hotspot, type Timeseries, type Season,
 } from './data';
 import { countryName, setCountryNames } from './countries';
+import { createTimeline, type Range } from './timeline';
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -66,13 +67,17 @@ interface State {
   season: SeasonSel;
   showPosidonia: boolean;
   showPoints: boolean;
-  month: number | null;
+  /** Selected calendar months (indices into `calendar`), null = all. */
+  range: Range;
 }
 
-const state: State = { metric: 'on_posidonia', season: 'ALL', showPosidonia: true, showPoints: true, month: null };
+const state: State = { metric: 'on_posidonia', season: 'ALL', showPosidonia: true, showPoints: true, range: null };
 
 let meta: Meta | null = null;
 let hexes: Hexes | null = null;
+let monthly: HexesMonthly | null = null;
+/** Continuous month calendar from the first to the last data month; idx points into meta.months (-1 = no data). */
+let calendar: { month: string; idx: number }[] = [];
 let hexIndex = new Map<string, number>();
 let hexGeojson: GeoJSON.FeatureCollection | null = null;
 let hexCentroids: GeoJSON.FeatureCollection | null = null;
@@ -96,13 +101,7 @@ function buildHexGeojson(h: Hexes): GeoJSON.FeatureCollection {
   for (let i = 0; i < h.h3.length; i++) {
     let ring: number[][];
     try { ring = cellToBoundary(h.h3[i], true); } catch { continue; }
-    const props: Record<string, unknown> = {
-      i,
-      density: h.density?.[i] ?? null,
-      on_posidonia: h.on_posidonia?.[i] ?? 0,
-      large_on_posidonia: h.large_on_posidonia?.[i] ?? 0,
-    };
-    for (const s of SEASONS) for (const m of METRICS) props[`${m}_${s}`] = seasonalValues(h, m, s)[i] ?? 0;
+    const props: Record<string, unknown> = { i, [VALUE_KEY]: null };
     features.push({ type: 'Feature', id: i, properties: props, geometry: { type: 'Polygon', coordinates: [ring] } });
   }
   return { type: 'FeatureCollection', features };
@@ -133,44 +132,104 @@ function quantileBreaks(values: number[], isCount: boolean): number[] {
   return out.filter((b) => b > v[0]);
 }
 
-const METRICS: Metric[] = ['on_posidonia', 'large_on_posidonia', 'density'];
+/** Feature property holding the value currently shown (rewritten on every selection change). */
+const VALUE_KEY = 'v';
 
-/** Data built before seasonal large/density support only has seasonal boat counts. */
-const hasSeasonalMetrics = (h: Hexes | null) => !!h?.by_season_large && !!h?.by_season_clear_overpasses;
+interface Agg { on_posidonia: number[]; large_on_posidonia: number[]; density: number[] }
+let aggCache: { key: string; agg: Agg } | null = null;
 
-const seasonalCache = new Map<string, number[]>();
-function seasonalValues(h: Hexes, metric: Metric, s: Season): number[] {
-  const k = `${metric}_${s}`;
-  let v = seasonalCache.get(k);
-  if (v) return v;
-  const on = h.by_season?.[s] ?? [];
-  if (!hasSeasonalMetrics(h) || metric === 'on_posidonia') v = on;
-  else if (metric === 'large_on_posidonia') v = h.by_season_large![s] ?? [];
-  else {
-    const clear = h.by_season_clear_overpasses![s] ?? [];
-    v = on.map((n, i) => (clear[i] > 0 ? n / clear[i] : NaN));
+function buildCalendar(months: string[]): { month: string; idx: number }[] {
+  if (!months.length) return [];
+  const idx = new Map(months.map((m, k) => [m, k]));
+  let [y, mo] = months[0].split('-').map(Number);
+  const [ey, em] = months.at(-1)!.split('-').map(Number);
+  const out: { month: string; idx: number }[] = [];
+  while (y < ey || (y === ey && mo <= em)) {
+    const m = `${y}-${String(mo).padStart(2, '0')}`;
+    out.push({ month: m, idx: idx.get(m) ?? -1 });
+    if (++mo > 12) { mo = 1; y++; }
   }
-  seasonalCache.set(k, v);
-  return v;
+  return out;
 }
 
-/** The metric actually shown: old data falls back to boat counts for single seasons. */
-function activeMetric(): Metric {
-  return state.season !== 'ALL' && !hasSeasonalMetrics(hexes) ? 'on_posidonia' : state.metric;
+/** meta.months indices inside the selected range and season, or null when nothing is filtered. */
+function selectedMonthIdx(): number[] | null {
+  if (state.range === null && state.season === 'ALL') return null;
+  const [a, b] = state.range ?? [0, calendar.length - 1];
+  const out: number[] = [];
+  for (let c = a; c <= b; c++) {
+    const e = calendar[c];
+    if (e && e.idx >= 0 && (state.season === 'ALL' || seasonOf(e.month) === state.season)) out.push(e.idx);
+  }
+  return out;
 }
 
-function activeKey(): string {
-  return state.season === 'ALL' ? state.metric : `${activeMetric()}_${state.season}`;
+/** Per-hex values for the current selection. */
+function aggregate(): Agg {
+  const h = hexes!;
+  const sel = selectedMonthIdx();
+  const key = sel === null ? 'all' : monthly ? sel.join(',') : `season:${state.season}`;
+  if (aggCache?.key === key) return aggCache.agg;
+  const num = (a: (number | null)[] | undefined) => (a ?? []).map((x) => (x == null ? NaN : x));
+  const ratio = (on: number[], clear: number[] | undefined) => on.map((x, i) => (clear && clear[i] > 0 ? x / clear[i] : NaN));
+  let agg: Agg;
+  if (sel === null) {
+    agg = { on_posidonia: num(h.on_posidonia), large_on_posidonia: num(h.large_on_posidonia), density: num(h.density) };
+  } else if (monthly) {
+    const n = h.h3.length;
+    const M = monthly.months.length;
+    const want = new Uint8Array(M);
+    for (const k of sel) want[k] = 1;
+    const on = new Array<number>(n).fill(0);
+    const large = new Array<number>(n).fill(0);
+    const clear = new Array<number>(n).fill(0);
+    for (let r = 0; r < monthly.cell.length; r++) {
+      if (!want[monthly.month[r]]) continue;
+      on[monthly.cell[r]] += monthly.on_posidonia[r];
+      large[monthly.cell[r]] += monthly.large_on_posidonia[r];
+    }
+    for (let i = 0; i < n; i++) for (const k of sel) clear[i] += monthly.clear_overpasses[i * M + k];
+    agg = { on_posidonia: on, large_on_posidonia: large, density: ratio(on, clear) };
+  } else {
+    // Older build without hexes_monthly.json: no range selection, seasons come from hexes.json.
+    const s = state.season as Season;
+    const on = num(h.by_season?.[s]);
+    agg = {
+      on_posidonia: on,
+      large_on_posidonia: h.by_season_large ? num(h.by_season_large[s]) : on.map(() => NaN),
+      density: ratio(on, h.by_season_clear_overpasses?.[s]),
+    };
+  }
+  aggCache = { key, agg };
+  return agg;
 }
 
 function activeIsCount(): boolean {
-  return activeMetric() !== 'density';
+  return state.metric !== 'density';
 }
 
 function activeValues(): number[] {
-  if (!hexes) return [];
-  if (state.season !== 'ALL') return seasonalValues(hexes, activeMetric(), state.season);
-  return (hexes[state.metric] ?? []).map((x) => (x == null ? NaN : x));
+  return hexes ? aggregate()[state.metric] : [];
+}
+
+/** Copy the shown values into the hex features (centroid features share the same properties objects). */
+function writeValues() {
+  if (!hexGeojson) return;
+  const v = activeValues();
+  for (const f of hexGeojson.features) {
+    const x = v[f.properties!.i as number];
+    f.properties![VALUE_KEY] = Number.isFinite(x) ? x : null;
+  }
+}
+
+const seasonWord = (s: Season) => SEASON_LABEL[s].split(' ')[0].toLowerCase();
+
+function periodLabel(): string {
+  const r = state.range;
+  const m = (c: number) => fmtMonth(calendar[c]?.month);
+  let out = r === null ? 'All months' : r[0] === r[1] ? m(r[0]) : `${m(r[0])} – ${m(r[1])}`;
+  if (state.season !== 'ALL') out += `, ${seasonWord(state.season)} only`;
+  return out;
 }
 
 function ramp(): string[] {
@@ -182,7 +241,7 @@ function zeroColor() { return isDark() ? 'rgba(180,195,192,0.18)' : 'rgba(68,87,
 let currentBreaks: number[] = [];
 
 function fillColorExpr(): ExpressionSpecification {
-  const key = activeKey();
+  const key = VALUE_KEY;
   const isCount = activeIsCount();
   currentBreaks = quantileBreaks(activeValues(), isCount);
   const colors = ramp();
@@ -200,7 +259,7 @@ function fillColorExpr(): ExpressionSpecification {
 }
 
 function dotPaint() {
-  const key = activeKey();
+  const key = VALUE_KEY;
   const positive = ['>', ['coalesce', ['to-number', ['get', key]], 0], 0];
   return {
     'circle-color': fillColorExpr(),
@@ -215,10 +274,8 @@ function dotPaint() {
 function renderLegend() {
   const el = $('legend');
   const title = $('legend-title');
-  const key = activeKey();
   const isCount = activeIsCount();
-  const label = METRIC_LABEL[activeMetric()](largeLen);
-  title.textContent = state.season === 'ALL' ? label : `${label}, ${SEASON_LABEL[state.season as Season].toLowerCase()}`;
+  title.textContent = METRIC_LABEL[state.metric](largeLen);
   const vals = activeValues().filter((x) => Number.isFinite(x) && x > 0);
   if (!hexes || vals.length === 0) {
     el.innerHTML = '<p class="text-muted">No values to show.</p>';
@@ -245,35 +302,21 @@ function renderLegend() {
 
 // ---------- popups ----------
 
-function seasonBars(i: number): string {
-  if (!hexes?.by_season) return '';
-  const vals = SEASONS.map((s) => hexes!.by_season[s]?.[i] ?? 0);
-  if (vals.filter((v) => v > 0).length < 2) return '';
-  const max = Math.max(1, ...vals);
-  const bars = SEASONS.map((s, k) => {
-    const h = Math.round((vals[k] / max) * 36);
-    return `<div class="flex flex-1 flex-col items-center gap-0.5" title="${SEASON_LABEL[s]}: ${vals[k]}">
-      <span class="text-[10px] tabular text-ink-2">${fmtInt(vals[k])}</span>
-      <div class="flex h-9 w-full items-end"><div class="w-full rounded-t-sm" style="height:${Math.max(h, vals[k] > 0 ? 2 : 0)}px;background:var(--sea)"></div></div>
-      <span class="text-[10px] text-muted">${s}</span></div>`;
-  }).join('');
-  return `<div class="mt-2 border-t border-line pt-2"><div class="mb-1 text-[11px] text-muted">On Posidonia by season</div><div class="flex gap-1.5" role="img" aria-label="Detections by season: ${SEASONS.map((s, k) => `${s} ${vals[k]}`).join(', ')}">${bars}</div></div>`;
-}
-
 function hexPopupHtml(i: number): string {
   const h = hexes!;
   const row = (label: string, value: string) => `<tr><th class="py-0.5 pr-3 text-left font-normal text-muted">${label}</th><td class="py-0.5 text-right tabular font-medium">${value}</td></tr>`;
-  const d = h.density?.[i];
+  const a = aggregate();
+  const d = a.density[i];
   return `<div class="w-52 text-xs" title="H3 ${escapeHtml(h.h3[i])}">
-    <div class="text-muted">${escapeHtml(countryName(h.country?.[i]))}</div>
-    <div class="mt-1 text-2xl font-semibold leading-none tabular">${fmtInt(h.on_posidonia?.[i])}</div>
+    <div class="font-medium text-ink-2">${escapeHtml(countryName(h.country?.[i]))}</div>
+    <div class="text-muted">${escapeHtml(periodLabel())}</div>
+    <div class="mt-2 text-2xl font-semibold leading-none tabular">${fmtInt(a.on_posidonia[i])}</div>
     <div class="mb-3 mt-1 text-ink-2">boats anchored on seagrass</div>
     <table class="w-full">
-      ${row(`≥ ${largeLen} m`, fmtInt(h.large_on_posidonia?.[i]))}
-      ${row('Per clear image', d == null ? 'n/a' : fmtNum(d, 2))}
+      ${row(`≥ ${largeLen} m`, fmtInt(a.large_on_posidonia[i]))}
+      ${row('Per clear image', Number.isFinite(d) ? fmtNum(d, 2) : 'n/a')}
       ${row('Seagrass here', `${fmtNum(h.posidonia_km2?.[i], 1)} km²`)}
     </table>
-    ${seasonBars(i)}
   </div>`;
 }
 
@@ -289,15 +332,17 @@ function pointPopupHtml(f: MapGeoJSONFeature): string {
 // ---------- map ----------
 
 export async function initMap() {
-  const [m, hx, hs, ts] = await Promise.all([
+  const [m, hx, hm, hs, ts] = await Promise.all([
     loadJson<Meta>('meta.json'),
     loadJson<Hexes>('hexes.json'),
+    loadJson<HexesMonthly>('hexes_monthly.json'),
     loadJson<Hotspot[]>('hotspots.json'),
     loadJson<Timeseries>('timeseries.json'),
   ]);
   meta = m;
   if (ts?.by_country) setCountryNames(Object.fromEntries(Object.entries(ts.by_country).map(([k, v]) => [k, v.name])));
   largeLen = meta?.params?.large_length_m ?? 24;
+  calendar = buildCalendar(meta?.months ?? []);
   if (hx && Array.isArray(hx.h3) && hx.h3.length > 0) {
     hexes = hx;
     hexIndex = new Map(hx.h3.map((id, i) => [id, i]));
@@ -310,6 +355,9 @@ export async function initMap() {
         return { type: 'Feature', id: f.id, properties: f.properties, geometry: { type: 'Point', coordinates: [lon, lat] } };
       }),
     };
+    const M = meta?.months?.length ?? 0;
+    if (hm && M > 0 && hm.months?.join() === meta!.months.join() && hm.clear_overpasses?.length === hx.h3.length * M) monthly = hm;
+    writeValues();
   }
 
   currentBreaks = quantileBreaks(activeValues(), activeIsCount());
@@ -341,7 +389,9 @@ export async function initMap() {
   const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px', focusAfterOpen: false });
   const hover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '240px', className: 'pw-hover' });
   let pinned = false;
-  popup.on('close', () => { pinned = false; });
+  /** Hex shown in the pinned popup, so it can follow selection changes. */
+  let pinnedHex: number | null = null;
+  popup.on('close', () => { pinned = false; pinnedHex = null; });
 
   const firstSymbolLayer = () => map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
 
@@ -387,7 +437,7 @@ export async function initMap() {
       map.addSource('hex-centroids', { type: 'geojson', data: hexCentroids });
       map.addLayer({
         id: 'hex-dots', type: 'circle', source: 'hex-centroids', maxzoom: DOTS_MAXZOOM,
-        layout: { 'circle-sort-key': ['to-number', ['get', activeKey()]] },
+        layout: { 'circle-sort-key': ['to-number', ['get', VALUE_KEY]] },
         paint: dotPaint(),
       }, before);
     }
@@ -412,15 +462,19 @@ export async function initMap() {
 
   function applyMonthFilter() {
     if (!map.getLayer('points')) return;
-    map.setFilter('points', state.month == null ? null : ['==', ['get', 'm'], state.month]);
+    const sel = selectedMonthIdx();
+    map.setFilter('points', sel === null ? null : ['in', ['get', 'm'], ['literal', sel]]);
   }
 
   function refreshHexColors() {
+    writeValues();
+    if (hexGeojson) (map.getSource('hexes') as GeoJSONSource | undefined)?.setData(hexGeojson);
+    if (hexCentroids) (map.getSource('hex-centroids') as GeoJSONSource | undefined)?.setData(hexCentroids);
     if (map.getLayer('hex-fill')) map.setPaintProperty('hex-fill', 'fill-color', fillColorExpr());
     if (map.getLayer('hex-dots')) {
       map.setPaintProperty('hex-dots', 'circle-color', fillColorExpr());
       map.setPaintProperty('hex-dots', 'circle-radius', dotPaint()['circle-radius']);
-      map.setLayoutProperty('hex-dots', 'circle-sort-key', ['to-number', ['get', activeKey()]]);
+      map.setLayoutProperty('hex-dots', 'circle-sort-key', ['to-number', ['get', VALUE_KEY]]);
     }
     else currentBreaks = quantileBreaks(activeValues(), activeIsCount());
     renderLegend();
@@ -440,7 +494,6 @@ export async function initMap() {
     const p = await loadJson<Points>('points.json');
     pointsGeojson = p ? buildPointsGeojson(p) : { type: 'FeatureCollection', features: [] };
     (map.getSource('points') as GeoJSONSource | undefined)?.setData(pointsGeojson);
-    populateMonths(p);
   }
 
   map.on('style.load', () => {
@@ -504,8 +557,10 @@ export async function initMap() {
     if (pt) {
       popup.setLngLat((pt.geometry as GeoJSON.Point).coordinates as [number, number]).setHTML(pointPopupHtml(pt)).addTo(map);
       pinned = true;
+      pinnedHex = null;
     } else if (hx) {
-      popup.setLngLat(e.lngLat).setHTML(hexPopupHtml(hx.properties.i as number)).addTo(map);
+      pinnedHex = hx.properties.i as number;
+      popup.setLngLat(e.lngLat).setHTML(hexPopupHtml(pinnedHex)).addTo(map);
       pinned = true;
     } else {
       popup.remove();
@@ -530,26 +585,69 @@ export async function initMap() {
     setOpen(true);
   }));
 
-  document.querySelectorAll<HTMLInputElement>('input[name="metric"]').forEach((r) =>
-    r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; refreshHexColors(); } }));
-
+  // ----- time: timeline brush + season filter -----
   const seasonButtons = document.querySelectorAll<HTMLButtonElement>('#season-group button');
-  // Seasons without any detections would blank the map, so they can't be picked.
-  const seasonsWithData = SEASONS.filter((ss) => hexes?.by_season?.[ss]?.some((v) => v > 0));
-  seasonButtons.forEach((b) => {
-    const ss = b.dataset.season as SeasonSel;
-    if (ss !== 'ALL' && !seasonsWithData.includes(ss)) {
-      b.disabled = true;
-      b.title = `${SEASON_LABEL[ss]}: no data yet`;
-    }
+  const timelineValues = () => {
+    const series = state.metric === 'large_on_posidonia' ? ts?.large_on_posidonia : ts?.anchored_on_posidonia;
+    return calendar.map((e) => (e.idx < 0 ? NaN : series?.[e.idx] ?? NaN));
+  };
+  const timeline = createTimeline($('timeline'), calendar.map((e) => e.month), {
+    interactive: monthly !== null,
+    title: (c) => {
+      const v = timelineValues()[c];
+      const what = state.metric === 'large_on_posidonia' ? `boats ≥ ${largeLen} m` : 'boats';
+      return `${fmtMonth(calendar[c].month)}: ${Number.isFinite(v) ? `${fmtInt(v)} ${what} on seagrass` : 'no data'}`;
+    },
+    onChange: (r) => { state.range = r; update(); },
   });
+
+  function updateSeasonButtons() {
+    const [a, b] = state.range ?? [0, calendar.length - 1];
+    const avail = new Set<Season>();
+    for (let c = a; c <= b; c++) if (calendar[c]?.idx >= 0) avail.add(seasonOf(calendar[c].month));
+    if (state.season !== 'ALL' && !avail.has(state.season)) state.season = 'ALL';
+    seasonButtons.forEach((btn) => {
+      const ss = btn.dataset.season as SeasonSel;
+      btn.setAttribute('aria-pressed', String(ss === state.season));
+      if (ss === 'ALL') return;
+      btn.disabled = !avail.has(ss);
+      btn.title = avail.has(ss) ? SEASON_LABEL[ss] : `${SEASON_LABEL[ss]}: no data in the selected months`;
+    });
+  }
+
+  function renderTimeLabel() {
+    const first = calendar[0]?.month;
+    const last = calendar.at(-1)?.month;
+    $('time-label').innerHTML = state.range === null && state.season === 'ALL'
+      ? `All months <span class="text-muted">· ${escapeHtml(fmtMonth(first))} – ${escapeHtml(fmtMonth(last))}</span>`
+      : escapeHtml(periodLabel());
+    $('time-reset').hidden = state.range === null && state.season === 'ALL';
+  }
+
+  /** Re-render everything that depends on metric, range or season. */
+  function update() {
+    updateSeasonButtons();
+    refreshHexColors();
+    applyMonthFilter();
+    timeline.setRange(state.range);
+    timeline.setActive((c) => calendar[c].idx >= 0 && (state.season === 'ALL' || seasonOf(calendar[c].month) === state.season));
+    timeline.setValues(timelineValues());
+    renderTimeLabel();
+    if (pinnedHex !== null) popup.setHTML(hexPopupHtml(pinnedHex));
+  }
+
+  document.querySelectorAll<HTMLInputElement>('input[name="metric"]').forEach((r) =>
+    r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; update(); } }));
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
     state.season = b.dataset.season as SeasonSel;
-    seasonButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    ($('metric-group') as HTMLFieldSetElement).disabled = state.season !== 'ALL' && !hasSeasonalMetrics(hexes);
-    $('season-note').classList.toggle('hidden', state.season === 'ALL');
-    refreshHexColors();
+    update();
   }));
+  $('time-reset').addEventListener('click', () => {
+    state.range = null;
+    state.season = 'ALL';
+    update();
+  });
+  update();
 
   $<HTMLInputElement>('toggle-posidonia').addEventListener('change', (e) => {
     state.showPosidonia = (e.target as HTMLInputElement).checked;
@@ -559,28 +657,8 @@ export async function initMap() {
   $<HTMLInputElement>('toggle-points').addEventListener('change', (e) => {
     state.showPoints = (e.target as HTMLInputElement).checked;
     if (map.getLayer('points')) map.setLayoutProperty('points', 'visibility', state.showPoints ? 'visible' : 'none');
-    $<HTMLSelectElement>('month-select').disabled = !state.showPoints;
     ensurePoints();
   });
-  const monthSelect = $<HTMLSelectElement>('month-select');
-  monthSelect.addEventListener('change', () => {
-    state.month = monthSelect.value === '' ? null : Number(monthSelect.value);
-    applyMonthFilter();
-  });
-  populateMonths(null);
-
-  function populateMonths(p: Points | null) {
-    const months = meta?.months ?? [];
-    if (!months.length) return;
-    const present = p?.month ? new Set(p.month) : null;
-    const opts = ['<option value="">All months</option>'];
-    for (let k = months.length - 1; k >= 0; k--) {
-      if (present && !present.has(k)) continue;
-      opts.push(`<option value="${k}"${state.month === k ? ' selected' : ''}>${fmtMonth(months[k])}</option>`);
-    }
-    monthSelect.innerHTML = opts.join('');
-  }
-
   // ----- hotspots -----
   const list = $('hotspot-list');
   if (!hs || !Array.isArray(hs) || hs.length === 0) {
@@ -609,6 +687,7 @@ export async function initMap() {
         map.once('moveend', () => {
           popup.setLngLat([h.lon, h.lat]).setHTML(hexPopupHtml(i)).addTo(map);
           pinned = true;
+          pinnedHex = i;
         });
       }
     });
