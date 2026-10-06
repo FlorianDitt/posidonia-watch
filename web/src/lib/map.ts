@@ -234,6 +234,12 @@ function periodLabel(): string {
   return state.season === 'ALL' ? rangeLabel() : `${rangeLabel()}, ${seasonWord(state.season)} only`;
 }
 
+/** Calendar range covering one year (clipped to the data span). */
+function yearRange(year: string): Range {
+  const idx = calendar.flatMap((e, c) => (e.month.startsWith(`${year}-`) ? [c] : []));
+  return idx.length ? [idx[0], idx.at(-1)!] : null;
+}
+
 function ramp(): string[] {
   return [0, 1, 2, 3, 4].map((i) => cssVar(`--ramp-${i}`));
 }
@@ -617,11 +623,27 @@ export async function initMap() {
     });
   }
 
+  const yearButtons = document.querySelectorAll<HTMLButtonElement>('#year-group button');
   const METRIC_SHORT: Record<Metric, string> = { on_posidonia: 'Boats', large_on_posidonia: `Boats ≥ ${largeLen} m`, density: 'Density' };
+
+  /** Year whose full span equals the selected range, 'ALL' for no range, null for a custom range. */
+  function selectedYear(): string | null {
+    if (state.range === null) return 'ALL';
+    const r = state.range;
+    const y = calendar[r[0]].month.slice(0, 4);
+    const yr = yearRange(y);
+    return yr && yr[0] === r[0] && yr[1] === r[1] ? y : null;
+  }
 
   /** Section headers show the current value, so a collapsed section still tells what is filtered. */
   function renderSummaries() {
+    const year = selectedYear();
+    yearButtons.forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.year === year));
+      if (b.dataset.year !== 'ALL') b.disabled = monthly === null;
+    });
     $('sum-metric').textContent = METRIC_SHORT[state.metric];
+    $('sum-year').textContent = year === 'ALL' ? 'All' : year ?? 'Custom range';
     $('time-label').textContent = state.range === null ? 'All' : rangeLabel();
     $('sum-season').textContent = state.season === 'ALL' ? 'All' : SEASON_LABEL[state.season];
     $('time-reset').hidden = state.range === null;
@@ -643,6 +665,10 @@ export async function initMap() {
     r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; update(); } }));
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
     state.season = b.dataset.season as SeasonSel;
+    update();
+  }));
+  yearButtons.forEach((b) => b.addEventListener('click', () => {
+    state.range = b.dataset.year === 'ALL' ? null : yearRange(b.dataset.year!);
     update();
   }));
   $('time-reset').addEventListener('click', () => {

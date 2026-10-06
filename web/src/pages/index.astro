@@ -5,6 +5,7 @@ import { readMeta, DEFAULT_PARAMS } from '../lib/buildMeta';
 
 const meta = readMeta();
 const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
+const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
 ---
 
 <Base app description="Interactive map of boats anchored on protected Posidonia oceanica seagrass across the Mediterranean, from Sentinel-2 satellite detections.">
@@ -47,6 +48,17 @@ const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
               <label class="seg seg-radio"><input type="radio" name="metric" value="density" class="sr-only" />Density</label>
             </div>
           </fieldset>
+        </details>
+
+        <details class="sec">
+          <summary><span class="sec-title">Year</span><span id="sum-year" class="sec-value">All</span><span class="chev" aria-hidden="true">▾</span></summary>
+          <div class="sec-body">
+            <div id="year-group" class="grid grid-cols-4 gap-1" role="group" aria-label="Year">
+              {['ALL', ...years].map((y) => (
+                <button type="button" data-year={y} aria-pressed={y === 'ALL' ? 'true' : 'false'} class="seg">{y === 'ALL' ? 'All' : y}</button>
+              ))}
+            </div>
+          </div>
         </details>
 
         <details class="sec">
