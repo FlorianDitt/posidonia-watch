@@ -1,18 +1,24 @@
-# Data and model artifacts (large / regenerable)
-data/
-models/
+# Raw downloads and intermediate caches (large / regenerable)
+pipeline/data/raw/
+pipeline/data/cache/
 
 # Python
 .venv/
 __pycache__/
 *.py[cod]
-
-# Jupyter
+.pytest_cache/
 .ipynb_checkpoints/
+
+# Node / Astro
+node_modules/
+web/dist/
+web/.astro/
 
 # Secrets
 .env
 *.env
 
-# IDE
+# IDE / OS
 .idea/
+.vscode/
+.DS_Store
