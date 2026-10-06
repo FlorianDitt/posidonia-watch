@@ -1,0 +1,143 @@
+---
+import Base from '../layouts/Base.astro';
+import { withBase, fmtDate } from '../lib/data';
+import { readMeta, DEFAULT_PARAMS } from '../lib/buildMeta';
+
+const meta = readMeta();
+const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
+---
+
+<Base app description="Interactive map of boats anchored on protected Posidonia oceanica seagrass across the Mediterranean, from Sentinel-2 satellite detections.">
+  <div id="map" class="absolute inset-0 bg-surface-2" role="region" aria-label="Map of anchoring pressure on Posidonia meadows"></div>
+
+  <div id="map-status" class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6" aria-live="polite">
+    <p class="rounded-lg bg-surface/90 px-4 py-3 text-sm text-ink-2 shadow">Loading map…</p>
+  </div>
+
+  <aside
+    id="panel"
+    data-open="false"
+    aria-label="Map controls and hotspots"
+    class="panel absolute z-20 flex flex-col overflow-hidden border border-line bg-surface text-sm shadow-lg
+      max-sm:inset-x-0 max-sm:bottom-0 max-sm:rounded-t-2xl max-sm:border-b-0
+      sm:left-3 sm:top-3 sm:max-h-[calc(100%-1.5rem)] sm:w-80 sm:rounded-xl"
+  >
+    <div class="flex items-center gap-1 border-b border-line px-2 py-2">
+      <div role="tablist" aria-label="Panel" class="flex flex-1 gap-1">
+        <button role="tab" id="tab-layers" aria-controls="pane-layers" aria-selected="true" class="tab">Layers</button>
+        <button role="tab" id="tab-hotspots" aria-controls="pane-hotspots" aria-selected="false" class="tab">Hotspots</button>
+      </div>
+      <button id="panel-toggle" class="rounded-md px-2 py-1 text-ink-2 hover:bg-surface-2 sm:hidden" aria-expanded="false" aria-controls="panel-body">
+        <span class="when-closed">Show ▴</span><span class="when-open">Hide ▾</span>
+      </button>
+    </div>
+
+    <div id="panel-body" class="panel-body min-h-0 flex-1 overflow-y-auto">
+      <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="space-y-5 p-4">
+        <fieldset id="metric-group">
+          <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Colour hexagons by</legend>
+          <div class="space-y-1.5">
+            <label class="flex items-start gap-2"><input type="radio" name="metric" value="density" checked class="mt-1 accent-[var(--sea)]" />
+              <span><span class="font-medium text-ink">Density</span> <span class="block text-xs text-muted">boats on Posidonia per clear satellite image</span></span></label>
+            <label class="flex items-start gap-2"><input type="radio" name="metric" value="on_posidonia" class="mt-1 accent-[var(--sea)]" />
+              <span><span class="font-medium text-ink">Anchored on Posidonia</span> <span class="block text-xs text-muted">total detections, all months</span></span></label>
+            <label class="flex items-start gap-2"><input type="radio" name="metric" value="large_on_posidonia" class="mt-1 accent-[var(--sea)]" />
+              <span><span class="font-medium text-ink">Large vessels on Posidonia</span> <span class="block text-xs text-muted">≥ {large} m, total detections</span></span></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Season</legend>
+          <div class="grid grid-cols-5 gap-1" id="season-group">
+            {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
+              <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
+                title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
+                {s === 'ALL' ? 'All' : s}
+              </button>
+            ))}
+          </div>
+          <p id="season-note" class="mt-2 hidden text-xs text-muted">Seasonal view colours by the number of detections anchored on Posidonia in that season (all years).</p>
+        </fieldset>
+
+        <div>
+          <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted" id="legend-title">Legend</h2>
+          <div id="legend" class="space-y-1 tabular text-xs text-ink-2"></div>
+        </div>
+
+        <fieldset class="space-y-2">
+          <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Overlays</legend>
+          <label class="flex items-center gap-2"><input type="checkbox" id="toggle-posidonia" checked class="accent-[var(--seagrass)]" />
+            <span class="inline-block h-3 w-4 rounded-sm border border-seagrass bg-seagrass/30"></span>
+            <span>Posidonia meadows <span class="text-xs text-muted">(zoom 8+)</span></span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="toggle-points" checked class="accent-[var(--sea)]" />
+            <span class="inline-flex w-4 items-center justify-center gap-0.5"><span class="inline-block h-1.5 w-1.5 rounded-full" style="background:var(--point-small)"></span><span class="inline-block h-2.5 w-2.5 rounded-full" style="background:var(--point-large)"></span></span>
+            <span>Individual detections <span class="text-xs text-muted">(zoom 11+)</span></span></label>
+          <div class="pl-6 text-xs text-muted">
+            <span class="inline-block h-2.5 w-2.5 rounded-full align-middle" style="background:var(--point-large)"></span> ≥ {large} m
+            <span class="ml-2 inline-block h-1.5 w-1.5 rounded-full align-middle" style="background:var(--point-small)"></span> smaller
+          </div>
+          <label class="block pl-6">
+            <span class="sr-only">Detections month</span>
+            <select id="month-select" class="w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink">
+              <option value="">All months</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <p class="border-t border-line pt-3 text-xs leading-relaxed text-muted">
+          Detections show anchoring <em>pressure</em>, not proven violations; boats under ~15 m are often missed.
+          <a class="text-sea underline" href={withBase('about/')}>Method &amp; limitations</a>.
+          <span class="mt-1 block tabular">Data updated {meta ? fmtDate(meta.generated_at) : '–'}</span>
+        </p>
+      </section>
+
+      <section id="pane-hotspots" role="tabpanel" aria-labelledby="tab-hotspots" hidden class="p-2">
+        <p class="px-2 pb-2 pt-1 text-xs text-muted">Cells with the most boats anchored on Posidonia (all months). Select one to fly there.</p>
+        <ol id="hotspot-list" class="space-y-0.5"></ol>
+      </section>
+    </div>
+  </aside>
+</Base>
+
+<style>
+  .tab {
+    border-radius: 0.375rem;
+    padding: 0.35rem 0.75rem;
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  .tab[aria-selected='true'] {
+    background: var(--seagrass-soft);
+    color: var(--ink);
+  }
+  .tab:hover { color: var(--ink); }
+  .seg {
+    border: 1px solid var(--line);
+    border-radius: 0.375rem;
+    padding: 0.3rem 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink-2);
+    background: var(--surface);
+  }
+  .seg[aria-pressed='true'] {
+    background: var(--sea);
+    border-color: var(--sea);
+    color: var(--surface);
+  }
+  .seg:disabled { opacity: 0.5; }
+  #metric-group:disabled { opacity: 0.55; }
+  .when-open { display: none; }
+  .panel[data-open='true'] .when-open { display: inline; }
+  .panel[data-open='true'] .when-closed { display: none; }
+  @media (max-width: 639.98px) {
+    .panel .panel-body { display: none; }
+    .panel[data-open='true'] .panel-body { display: block; max-height: 60dvh; }
+    .panel { padding-bottom: env(safe-area-inset-bottom); }
+  }
+</style>
+
+<script>
+  import { initMap } from '../lib/map';
+  initMap();
+</script>
