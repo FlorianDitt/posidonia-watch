@@ -20,9 +20,10 @@ params:
   large_length_m: 24         # French 2020 anchoring regulation threshold
 
 filters:
-  presence_score_min: 0.5    # GFW: probability the detection is a vessel
-  nonvessel_score_max: 0.5   # GFW: probability the detection is NOT a vessel (rock, wake, cloud...)
-  cloud_score_max: 0.5       # GFW: cloudiness around the detection
+  # See README "Thresholds" for the evidence (2025-07/08 Med sample).
+  presence_score_min: 0.3    # GFW presence score; 0.3 is the floor of the published data, i.e. keep all
+  nonvessel_score_max: 0.95  # drop only the most confident "not a vessel" detections
+  cloud_score_max: 0.5       # drop detections in cloudy surroundings (~1 % of slow detections)
   length_m_min: 0            # no lower length cut (10 m pixels already limit to >= ~10-15 m)
   exclude_infrastructure: true
   exclude_ice: true

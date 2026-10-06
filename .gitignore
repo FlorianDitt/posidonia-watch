@@ -16,7 +16,6 @@ web/.astro/
 
 # Secrets
 .env
-*.env
 
 # IDE / OS
 .idea/
