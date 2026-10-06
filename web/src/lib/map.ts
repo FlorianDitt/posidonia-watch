@@ -503,6 +503,15 @@ export async function initMap() {
     r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; refreshHexColors(); } }));
 
   const seasonButtons = document.querySelectorAll<HTMLButtonElement>('#season-group button');
+  // Seasons without any detections would blank the map, so they can't be picked.
+  const seasonsWithData = SEASONS.filter((ss) => hexes?.by_season?.[ss]?.some((v) => v > 0));
+  seasonButtons.forEach((b) => {
+    const ss = b.dataset.season as SeasonSel;
+    if (ss !== 'ALL' && !seasonsWithData.includes(ss)) {
+      b.disabled = true;
+      b.title = `${SEASON_LABEL[ss]}: no data yet`;
+    }
+  });
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
     state.season = b.dataset.season as SeasonSel;
     seasonButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
