@@ -14,6 +14,11 @@ const licenceUrl: Record<string, string> = {
   'CC0-1.0': 'https://creativecommons.org/publicdomain/zero/1.0/',
   'CC-BY-4.0': 'https://creativecommons.org/licenses/by/4.0/',
 };
+const emodnetRecord =
+  'https://emodnet.ec.europa.eu/geonetwork/srv/eng/catalog.search#/metadata/39746d9c-4220-425c-bc26-7cb3056c36a5';
+// Years of Sentinel-2 imagery behind the current release, for the Copernicus notice.
+const years = [...new Set(months.map((m) => m.slice(0, 4)))];
+const sentinelYears = years.length > 1 ? `${years[0]}–${years[years.length - 1]}` : (years[0] ?? '');
 ---
 
 <Base title="About & methodology" description="Why Posidonia matters, the data sources and licences, how anchored boats on seagrass are detected, and the limitations of the method.">
@@ -41,20 +46,34 @@ const licenceUrl: Record<string, string> = {
     <h2>Data sources</h2>
     <ul>
       <li>
-        <strong>Vessel detections</strong> – <a href="https://globalfishingwatch.org/" rel="noopener">Global Fishing Watch</a>,
-        Sentinel-2 vessel detections (10 m optical imagery, ESA Copernicus). Licence{' '}
-        <a href={licenceUrl['CC0-1.0']} rel="noopener">CC0 1.0</a>; credit to Global Fishing Watch is appreciated.
+        <strong>Vessel detections</strong> – Global Fishing Watch (2026). <em>Vessel detections from Sentinel 2</em>. Zenodo.{' '}
+        <a href="https://doi.org/10.5281/zenodo.15978308" rel="noopener">doi:10.5281/zenodo.15978308</a>.
+        Licence <a href={licenceUrl['CC0-1.0']} rel="noopener">CC0 1.0</a>.
+        Contains modified Copernicus Sentinel data {sentinelYears}: the detections are derived by{' '}
+        <a href="https://globalfishingwatch.org/" rel="noopener">Global Fishing Watch</a> from ESA Copernicus Sentinel-2 imagery.
       </li>
       <li>
-        <strong>Seagrass maps</strong> – <a href="https://emodnet.ec.europa.eu/en/seabed-habitats" rel="noopener">EMODnet Seabed Habitats</a>,
-        seagrass essential ocean variable (EOV) polygons 2025, filtered to <em>Posidonia oceanica</em>.
-        Licence <a href={licenceUrl['CC-BY-4.0']} rel="noopener">CC-BY 4.0</a>. The derived data on this site therefore also requires attribution to EMODnet.
+        <strong>Seagrass maps</strong> – EMODnet Seabed Habitats (2025). <em>Seagrass cover (Essential Ocean Variable) in Europe and the Caribbean, version 2025</em>.
+        European Marine Observation and Data Network (EMODnet) Seabed Habitats.{' '}
+        <a href={emodnetRecord} rel="noopener">Catalogue record</a>.
+        Contains information sourced from multiple organisations through EMODnet Seabed Habitats.
+        Licensed under <a href={licenceUrl['CC-BY-4.0']} rel="noopener">CC BY 4.0</a>.
+        <br /><span class="text-sm">Changes made: European subset only, filtered to <em>Posidonia oceanica</em> (dead matte excluded),
+        attributes removed, and geometries simplified (Douglas–Peucker, ≥ 30 m tolerance) and rounded for display.
+        The analysis itself uses the unsimplified polygons, buffered by {p.posidonia_buffer_m} m.</span>
       </li>
       <li>
-        <strong>Basemap</strong> – <a href="https://openfreemap.org/" rel="noopener">OpenFreeMap</a>, with map data
+        <strong>Country attribution</strong> – Flanders Marine Institute (2023). <em>Maritime Boundaries Geodatabase: Maritime Boundaries and Exclusive Economic Zones (200NM), version 12</em>.
+        Available online at <a href="https://www.marineregions.org/" rel="noopener">marineregions.org</a>.{' '}
+        <a href="https://doi.org/10.14284/632" rel="noopener">doi:10.14284/632</a>.
+        Licensed under <a href={licenceUrl['CC-BY-4.0']} rel="noopener">CC BY 4.0</a>.
+        <br /><span class="text-sm">Changes made: used only to assign each detection to a country; boundaries are not redistributed.</span>
+      </li>
+      <li>
+        <strong>Basemap</strong> – <a href="https://openfreemap.org/" rel="noopener">OpenFreeMap</a>{' '}
+        © <a href="https://www.openmaptiles.org/" rel="noopener">OpenMapTiles</a>, data from
         © <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap contributors</a> (ODbL).
       </li>
-      <li><strong>Country attribution</strong> – exclusive economic zones from Marine Regions.</li>
     </ul>
     {meta?.sources?.length ? (
       <p class="text-sm">
@@ -99,10 +118,22 @@ const licenceUrl: Record<string, string> = {
       <p>No data has been published yet. Parameters above are the defaults.</p>
     )}
 
-    <h2>Open source</h2>
+    <h2>Open source and licences</h2>
     <p>
       Code (MIT), pipeline, data contract and issue tracker are on{' '}
       <a href={repo} rel="noopener">GitHub</a>. Corrections and better seagrass data are very welcome.
     </p>
+    <ul>
+      <li><strong>Code</strong> – <a href={`${repo}/blob/main/LICENSE`} rel="noopener">MIT</a>.</li>
+      <li>
+        <strong>Data published by this site</strong> (the JSON and GeoJSON files under <code>data/</code>) –{' '}
+        <a href={licenceUrl['CC-BY-4.0']} rel="noopener">CC BY 4.0</a>. Please credit “posidonia-watch” together with
+        Global Fishing Watch, EMODnet Seabed Habitats and Flanders Marine Institute as listed above.
+      </li>
+      <li>
+        <strong>Third-party software</strong> shipped to your browser (MapLibre GL JS, h3-js) –{' '}
+        <a href={withBase('THIRD_PARTY_LICENSES.txt')}>licence texts</a>.
+      </li>
+    </ul>
   </article>
 </Base>
