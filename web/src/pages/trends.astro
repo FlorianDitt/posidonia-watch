@@ -1,0 +1,67 @@
+---
+import Base from '../layouts/Base.astro';
+import { readMeta, DEFAULT_PARAMS } from '../lib/buildMeta';
+
+const meta = readMeta();
+const large = meta?.params?.large_length_m ?? DEFAULT_PARAMS.large_length_m;
+---
+
+<Base title="Trends" description="Monthly trends of boats anchored on Posidonia oceanica seagrass across the Mediterranean, overall and per country.">
+  <div class="mx-auto max-w-5xl px-4 pt-10">
+    <h1 class="text-3xl font-semibold tracking-tight">Trends</h1>
+    <p class="mt-2 max-w-2xl text-ink-2">
+      Monthly counts of anchored vessel detections in Sentinel-2 imagery, Mediterranean-wide.
+      Counts are <strong class="font-medium text-ink">not</strong> normalised for cloud cover, so cloudy months read lower.
+    </p>
+
+    <p id="trends-empty" hidden class="mt-8 rounded-lg border border-line bg-surface p-6 text-ink-2">
+      No time series published yet – the data pipeline has not produced <code>timeseries.json</code>.
+    </p>
+
+    <div id="trends-content" class="space-y-10">
+      <section class="mt-8 rounded-xl border border-line bg-surface p-4 sm:p-6" aria-labelledby="h-posidonia">
+        <h2 id="h-posidonia" class="text-lg font-semibold">Detections anchored on Posidonia</h2>
+        <p class="mt-1 text-sm text-muted">Vessels per month, all sizes vs. large vessels (≥ {large} m). Hover or use the arrow keys for values.</p>
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-2" aria-hidden="true">
+          <span class="flex items-center gap-2"><span class="inline-block h-0.5 w-5" style="background:var(--series-1)"></span>All anchored on Posidonia</span>
+          <span class="flex items-center gap-2"><span class="inline-block h-0.5 w-5" style="background:var(--series-2)"></span>Large (≥ {large} m) on Posidonia</span>
+        </div>
+        <div id="chart-main" class="mt-3"></div>
+      </section>
+
+      <section class="rounded-xl border border-line bg-surface p-4 sm:p-6" aria-labelledby="h-context">
+        <h2 id="h-context" class="text-lg font-semibold">Context: all anchored detections</h2>
+        <p class="mt-1 text-sm text-muted">Every anchored vessel detected in the Mediterranean per month, whether on Posidonia or not (incl. harbours and marinas).</p>
+        <div id="chart-context" class="mt-3"></div>
+      </section>
+
+      <section aria-labelledby="h-countries">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="h-countries" class="text-lg font-semibold">By country (EEZ)</h2>
+            <p class="mt-1 text-sm text-muted">Anchored on Posidonia per month, by the exclusive economic zone the detection lies in.
+              <span class="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap"><span class="inline-block h-0.5 w-4" style="background:var(--series-1)"></span>all</span>
+              <span class="ml-2 inline-flex items-center gap-1.5 whitespace-nowrap"><span class="inline-block h-0.5 w-4" style="background:var(--series-2)"></span>large (≥ {large} m)</span></p>
+          </div>
+          <label class="flex items-center gap-2 text-sm text-ink-2">
+            <input type="checkbox" id="shared-scale" class="accent-[var(--sea)]" />
+            Same y-scale for all countries
+          </label>
+        </div>
+        <div id="country-grid" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
+      </section>
+
+      <details class="rounded-xl border border-line bg-surface p-4 sm:p-6">
+        <summary class="cursor-pointer font-medium">Data table</summary>
+        <div class="mt-3 overflow-x-auto">
+          <table id="data-table" class="w-full text-sm tabular"></table>
+        </div>
+      </details>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { initTrends } from '../lib/trends';
+  initTrends();
+</script>
