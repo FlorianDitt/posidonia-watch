@@ -297,16 +297,20 @@ function renderLegend() {
   const min = Math.min(...vals);
   const max = Math.max(...vals);
   const f = (x: number) => (isCount ? fmtInt(x) : fmtNum(x, x < 0.1 ? 3 : 2));
-  const rows: string[] = [];
-  for (let k = 0; k < nClasses; k++) {
-    const lo = k === 0 ? min : currentBreaks[k - 1];
-    const hi = k === nClasses - 1 ? max : currentBreaks[k];
-    const top = isCount && k !== nClasses - 1 ? Math.max(lo, hi - 1) : hi;
-    const range = f(lo) === f(top) ? f(lo) : `${f(lo)} – ${f(top)}`;
-    rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm" style="background:${pick(k)}"></span><span>${range}</span></div>`);
-  }
-  rows.push(`<div class="flex items-center gap-2"><span class="inline-block h-3 w-6 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`);
-  el.innerHTML = rows.join('');
+  // Horizontal bar, lowest class on the left: each class gets an equal slice, its colour sits at the slice
+  // centre and blends into its neighbours; ticks beneath mark the class boundaries.
+  const stops: string[] = [];
+  for (let k = 0; k < nClasses; k++) stops.push(`${pick(k)} ${(((k + 0.5) / nClasses) * 100).toFixed(1)}%`);
+  const bounds = [min, ...currentBreaks, max];
+  const ticks = bounds.map((x, k) => {
+    const pos = (k / nClasses) * 100;
+    const align = k === 0 ? 'items-start' : k === nClasses ? 'items-end -translate-x-full' : 'items-center -translate-x-1/2';
+    return `<div class="absolute top-0 flex flex-col ${align}" style="left:${pos.toFixed(1)}%"><span class="h-1.5 w-px bg-line"></span><span>${f(x)}</span></div>`;
+  });
+  el.innerHTML = `
+    <div class="h-3 rounded-sm" style="background:linear-gradient(to right, ${stops.join(', ')})"></div>
+    <div class="relative h-6">${ticks.join('')}</div>
+    <div class="mt-1 flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`;
   el.title = 'Classes are quantiles of non-zero cells';
 }
 
