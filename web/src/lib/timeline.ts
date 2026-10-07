@@ -30,6 +30,8 @@ export function createTimeline(
   let values: number[] = new Array(n).fill(NaN);
   let range: Range = null;
   let isActive: (c: number) => boolean = () => true;
+  /** True while the pointer drags the range, so echoes of our own onChange don't scroll the view. */
+  let dragging = false;
 
   // Each month gets a fixed slot, so long spans scroll sideways instead of shrinking the bars.
   root.innerHTML = `
@@ -108,6 +110,7 @@ export function createTimeline(
       return Math.min(n - 1, Math.max(0, Math.floor(((x - r.left) / r.width) * n)));
     };
     const set = (r: Range) => { range = r; paint(); emit(); };
+    const end = () => { mode = null; requestAnimationFrame(() => { dragging = false; }); };
     const same = (a: Range, b: [number, number]) => a !== null && a[0] === b[0] && a[1] === b[1];
 
     plotEl.addEventListener('pointerdown', (e) => {
@@ -129,6 +132,7 @@ export function createTimeline(
         anchor = c;
         set([c, c]);
       }
+      dragging = true;
       plotEl.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
@@ -153,13 +157,13 @@ export function createTimeline(
       // a click inside a multi-month range picks that month; clicking the single selected month again clears it
       if (mode === 'move' && !moved) set([grab, grab]);
       else if (mode === 'new' && !moved && before && before[0] === anchor && before[1] === anchor) set(null);
-      mode = null;
+      end();
     });
     // touch swipes on the bars scroll the timeline (touch-action: pan-x), which cancels the pointer
     plotEl.addEventListener('pointercancel', () => {
       if (mode === null) return;
-      mode = null;
       set(before);
+      end();
     });
 
     barsEl.addEventListener('keydown', (e) => {
@@ -186,7 +190,13 @@ export function createTimeline(
   requestAnimationFrame(() => { scrollEl.scrollLeft = scrollEl.scrollWidth; });
   return {
     setValues(v) { values = v; paint(); },
-    setRange(r) { range = r; paint(); reveal(r); },
+    setRange(r) {
+      // only external changes (year picker, reset) scroll; the pointer already shows where the range is
+      const external = !dragging && !(r === range || (r && range && r[0] === range[0] && r[1] === range[1]));
+      range = r;
+      paint();
+      if (external) reveal(r);
+    },
     setActive(f) { isActive = f; paint(); },
   };
 }
