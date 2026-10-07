@@ -672,8 +672,10 @@ export async function initMap() {
 
   document.querySelectorAll<HTMLInputElement>('input[name="metric"]').forEach((r) =>
     r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; update(); } }));
+  // clicking the selected season again goes back to all seasons
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
-    state.season = b.dataset.season as SeasonSel;
+    const s = b.dataset.season as SeasonSel;
+    state.season = s === state.season ? 'ALL' : s;
     update();
   }));
   $('time-reset').addEventListener('click', () => {
