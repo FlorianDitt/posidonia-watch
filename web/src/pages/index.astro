@@ -60,12 +60,17 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
           <summary><span class="sec-title">Time</span><span id="sum-time" class="sec-value" aria-live="polite">All</span><span class="chev" aria-hidden="true">▾</span></summary>
           <div class="sec-body space-y-4">
             <div>
-              <label for="year-select" class="sub block">Year</label>
-              <select id="year-select" class="select">
-                <option value="ALL" selected>All years</option>
-                {[...years].reverse().map((y) => <option value={y}>{y}</option>)}
-                <option value="CUSTOM" hidden disabled>Custom range</option>
-              </select>
+              <h3 class="sub" id="year-label">Year</h3>
+              <div class="dd" id="year-select">
+                <button type="button" class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="year-label year-value">
+                  <span class="dd-value" id="year-value">All years</span><span class="chev" aria-hidden="true">▾</span>
+                </button>
+                <ul class="dd-list" role="listbox" tabindex="-1" aria-labelledby="year-label" hidden>
+                  {['ALL', ...[...years].reverse()].map((y) => (
+                    <li role="option" id={`year-opt-${y}`} data-value={y} aria-selected={y === 'ALL' ? 'true' : 'false'}>{y === 'ALL' ? 'All years' : y}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
             <div>
               <div class="flex items-baseline justify-between gap-2">
@@ -144,21 +149,49 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     color: var(--surface);
   }
   .seg:disabled { opacity: 0.5; }
-  .select {
+  /* Year dropdown (behaviour in src/lib/select.ts) */
+  .dd-btn {
+    display: flex;
     width: 100%;
-    appearance: none;
+    align-items: center;
+    gap: 0.5rem;
     border: 1px solid var(--line);
     border-radius: 0.375rem;
-    padding: 0.4rem 2rem 0.4rem 0.625rem;
+    padding: 0.4rem 0.625rem;
     font-size: 0.8125rem;
     font-weight: 500;
     color: var(--ink);
-    background: var(--surface) no-repeat right 0.625rem center / 0.625rem
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5'/%3E%3C/svg%3E");
-    cursor: pointer;
+    background: var(--surface);
+    text-align: left;
   }
-  .select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  .select:disabled { opacity: 0.5; cursor: default; }
+  .dd-btn:hover:not(:disabled) { border-color: var(--muted); }
+  .dd-btn:disabled { opacity: 0.5; }
+  .dd-value { flex: 1; }
+  .dd-btn[aria-expanded='true'] .chev { transform: rotate(180deg); }
+  .dd-list {
+    position: fixed;
+    z-index: 50;
+    max-height: 20rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    background: var(--surface);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.15), 0 4px 6px -4px rgb(0 0 0 / 0.15);
+    font-size: 0.8125rem;
+  }
+  .dd-list:focus-visible { outline: none; }
+  .dd-list li {
+    cursor: pointer;
+    border-radius: 0.375rem;
+    padding: 0.35rem 0.5rem;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .dd-list li.dd-active { background: var(--surface-2); color: var(--ink); }
+  .dd-list li[aria-selected='true'] { background: var(--sea); color: var(--surface); font-weight: 500; }
   .seg-radio {
     display: flex;
     cursor: pointer;
@@ -220,7 +253,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .sec-body { padding-bottom: 1rem; }
   .sub { margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--muted); }
   .chev { font-size: 0.7rem; color: var(--muted); transition: transform 0.15s; }
-  .sec[open] .chev { transform: rotate(180deg); }
+  .sec[open] > summary .chev { transform: rotate(180deg); }
   #metric-group:disabled { opacity: 0.55; }
   .when-open { display: none; }
   .panel[data-open='true'] .when-open { display: inline; }

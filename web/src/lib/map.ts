@@ -13,6 +13,7 @@ import {
 } from './data';
 import { countryName, setCountryNames } from './countries';
 import { createTimeline, type Range } from './timeline';
+import { createSelect } from './select';
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -629,8 +630,12 @@ export async function initMap() {
     });
   }
 
-  const yearSelect = $<HTMLSelectElement>('year-select');
   const METRIC_SHORT: Record<Metric, string> = { on_posidonia: 'Boats', large_on_posidonia: `Boats ≥ ${largeLen} m`, density: 'Density' };
+
+  const yearSelect = createSelect($('year-select'), (y) => {
+    state.range = y === 'ALL' ? null : yearRange(y);
+    update();
+  });
 
   /** Year whose full span equals the selected range, 'ALL' for no range, null for a custom range. */
   function selectedYear(): string | null {
@@ -644,8 +649,8 @@ export async function initMap() {
   /** Section headers show the current value, so a collapsed section still tells what is filtered. */
   function renderSummaries() {
     const year = selectedYear();
-    yearSelect.value = year ?? 'CUSTOM';
-    yearSelect.disabled = monthly === null;
+    yearSelect.setValue(year, 'Custom range');
+    yearSelect.setDisabled(monthly === null);
     $('sum-metric').textContent = METRIC_SHORT[state.metric];
     const when = year === 'ALL' ? 'All' : year ?? rangeLabel();
     $('sum-time').textContent = state.season === 'ALL' ? when
@@ -671,10 +676,6 @@ export async function initMap() {
     state.season = b.dataset.season as SeasonSel;
     update();
   }));
-  yearSelect.addEventListener('change', () => {
-    state.range = yearSelect.value === 'ALL' ? null : yearRange(yearSelect.value);
-    update();
-  });
   $('time-reset').addEventListener('click', () => {
     state.range = null;
     update();
