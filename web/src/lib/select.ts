@@ -24,20 +24,26 @@ export function createSelect(root: HTMLElement, onChange: (value: string) => voi
     options[active].scrollIntoView({ block: 'nearest' });
   }
 
-  /** Fixed positioning so the list is not clipped by the scrolling panel; opens upwards when there is no room below. */
+  /**
+   * Fixed positioning so the list is not clipped by the scrolling panel; opens upwards when there is no room below.
+   * Its height is capped to the room on that side, so it never runs off-screen (and it scrolls itself, not the page).
+   */
   function place() {
     const r = btn.getBoundingClientRect();
     list.style.left = `${r.left}px`;
     list.style.width = `${r.width}px`;
+    list.style.maxHeight = '';
     const below = window.innerHeight - r.bottom;
     const h = Math.min(list.scrollHeight, 320);
-    if (below < h + 8 && r.top > below) {
+    const up = below < h + 8 && r.top > below;
+    if (up) {
       list.style.top = '';
       list.style.bottom = `${window.innerHeight - r.top + 4}px`;
     } else {
       list.style.bottom = '';
       list.style.top = `${r.bottom + 4}px`;
     }
+    list.style.maxHeight = `${Math.min(320, Math.max(64, (up ? r.top : below) - 12))}px`;
   }
 
   function open() {
