@@ -641,8 +641,7 @@ export async function initMap() {
   };
   const timeline = createTimeline($('timeline'), calendar.map((e) => e.month), {
     interactive: monthly !== null,
-    title: (c) => {
-      const v = timelineValues()[c];
+    title: (c, v) => {
       const what = state.metric === 'large_on_posidonia' ? `boats ≥ ${largeLen} m` : 'boats';
       return `${fmtMonth(calendar[c].month)}: ${Number.isFinite(v) ? `${fmtInt(v)} ${what} on seagrass` : 'no data'}`;
     },
@@ -706,9 +705,11 @@ export async function initMap() {
     updateSeasonButtons();
     refreshHexColors();
     applyPointFilter();
-    timeline.setRange(state.range);
-    timeline.setActive((c) => calendar[c].idx >= 0 && (state.season === 'ALL' || seasonOf(calendar[c].month) === state.season));
-    timeline.setValues(timelineValues());
+    timeline.update({
+      range: state.range,
+      isActive: (c) => calendar[c].idx >= 0 && (state.season === 'ALL' || seasonOf(calendar[c].month) === state.season),
+      values: timelineValues(),
+    });
     renderSummaries();
     if (pinnedHex !== null) popup.setHTML(hexPopupHtml(pinnedHex));
   }

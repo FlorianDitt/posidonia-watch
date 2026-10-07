@@ -5,10 +5,13 @@
 export type Range = [number, number] | null;
 
 export interface Timeline {
-  setValues(values: number[]): void;
-  setRange(range: Range): void;
-  /** Months outside the active set (e.g. other seasons) are drawn muted even inside the range. */
-  setActive(isActive: (c: number) => boolean): void;
+  /** Change any of these and repaint once. */
+  update(next: {
+    values?: number[];
+    range?: Range;
+    /** Months outside the active set (e.g. other seasons) are drawn muted even inside the range. */
+    isActive?: (c: number) => boolean;
+  }): void;
 }
 
 /**
@@ -20,7 +23,8 @@ export function createTimeline(
   months: string[],
   opts: {
     interactive: boolean;
-    title: (c: number) => string;
+    /** Tooltip of month `c`, whose value is `v`. */
+    title: (c: number, v: number) => string;
     /** Text shown inside the selection window. */
     label: (r: [number, number]) => string;
     onChange: (r: Range) => void;
@@ -69,7 +73,7 @@ export function createTimeline(
       const inRange = range === null || (c >= range[0] && c <= range[1]);
       b.classList.toggle('tl-on', inRange && isActive(c));
       b.classList.toggle('tl-in', range !== null && range[1] > range[0] && inRange);
-      b.title = opts.title(c);
+      b.title = opts.title(c, v);
     });
     winEl.hidden = frameEl.hidden = winLabel.hidden = range === null;
     if (range === null) return;
@@ -255,15 +259,16 @@ export function createTimeline(
     else scrollEl.scrollLeft = scrollEl.scrollWidth;
   }).observe(scrollEl);
   return {
-    setValues(v) { values = v; paint(); },
-    setRange(r) {
-      // only external changes (year picker, reset) scroll; the pointer already shows where the range is
-      const external = !dragging && !(r === range || (r && range && r[0] === range[0] && r[1] === range[1]));
-      range = r;
+    update(next) {
+      // only external range changes (year picker, reset) scroll; the pointer already shows where the range is
+      const r = next.range;
+      const external = r !== undefined && !dragging && !(r === range || (r && range && r[0] === range[0] && r[1] === range[1]));
+      if (next.values) values = next.values;
+      if (r !== undefined) range = r;
+      if (next.isActive) isActive = next.isActive;
       paint();
-      if (external) reveal(r);
+      if (external) reveal(range);
     },
-    setActive(f) { isActive = f; paint(); },
   };
 }
 
