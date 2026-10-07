@@ -14,7 +14,7 @@ Stationary vessels (≈0 kn) inside Posidonia polygons are counted per H3 hexago
 ## Layout
 
 ```
-pipeline/   Python data pipeline (uv). Runs monthly in GitHub Actions.
+pipeline/   Python data pipeline (uv). Checked weekly for new releases in GitHub Actions.
 web/        Astro + Tailwind static site (MapLibre map). Deployed to GitHub Pages.
 docs/       Data contract between pipeline and web, methodology notes.
 ```

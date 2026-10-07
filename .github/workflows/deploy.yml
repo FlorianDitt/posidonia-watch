@@ -6,7 +6,7 @@ on:
     paths:
       - "web/**"
       - ".github/workflows/deploy.yml"
-  # Also triggered by the data pipeline workflow: `gh workflow run deploy.yml`
+  # New data arrives as a merged pull request from update-data.yml, i.e. a push to web/.
   workflow_dispatch:
 
 permissions:
