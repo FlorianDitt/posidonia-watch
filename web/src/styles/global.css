@@ -139,7 +139,6 @@ body {
 .prose-pw strong { color: var(--ink); font-weight: 600; }
 .prose-pw code { font-size: 0.9em; background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 4px; }
 
-/* MapLibre popup theming */
 .maplibregl-popup-content {
   background: var(--surface) !important;
   color: var(--ink);
@@ -163,7 +162,6 @@ body {
   /* keep attribution/scale above the collapsed bottom sheet */
   .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 52px; }
 }
-/* MapLibre controls in dark mode */
 .maplibregl-ctrl-group, .maplibregl-ctrl-attrib, .maplibregl-ctrl-scale {
   @variant dark { background: rgba(20, 34, 37, 0.9) !important; color: var(--ink-2); border-color: var(--ink-2); }
 }

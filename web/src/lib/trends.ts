@@ -38,7 +38,6 @@ export async function initTrends() {
     series: [{ label: 'All anchored', values: total, color: 'var(--series-context)' }],
   });
 
-  // ----- small multiples -----
   const grid = document.getElementById('country-grid')!;
   const shared = document.getElementById('shared-scale') as HTMLInputElement;
   const countries = Object.entries(ts.by_country ?? {})
@@ -85,7 +84,6 @@ export async function initTrends() {
   shared.addEventListener('change', renderCountries);
   renderCountries();
 
-  // ----- data table -----
   const table = document.getElementById('data-table')!;
   table.innerHTML =
     `<caption class="sr-only">Monthly Mediterranean totals</caption>

@@ -1,4 +1,3 @@
-// Tiny hand-rolled SVG line chart (no dependencies, ~3 KB min).
 // Features: nice y ticks, year ticks on x, crosshair + tooltip on pointer and keyboard (← →), resize-aware.
 import { fmtInt, fmtMonth, escapeHtml } from './data';
 
@@ -69,7 +68,6 @@ export function lineChart(container: HTMLElement, opts: ChartOptions): () => voi
     geom = { x, y, left: m.left, right: width - m.right, top: m.top, bottom: height - m.bottom, width };
 
     const parts: string[] = [];
-    // grid + y ticks
     for (let v = 0; v <= yMax + 1e-9; v += step) {
       parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`);
       parts.push(`<text x="${m.left - 6}" y="${y(v)}" dy="0.32em" text-anchor="end" fill="var(--muted)" font-size="11">${fmtTick(v)}</text>`);
@@ -88,7 +86,6 @@ export function lineChart(container: HTMLElement, opts: ChartOptions): () => voi
       parts.push(`<text x="${x(i)}" y="${height - m.bottom + 16}" text-anchor="${i === 0 ? 'start' : 'middle'}" fill="var(--muted)" font-size="11">${escapeHtml(label)}</text>`);
     });
     parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${height - m.bottom}" y2="${height - m.bottom}" stroke="var(--muted)" stroke-width="1"/>`);
-    // lines
     for (const s of opts.series) {
       let d = '';
       let pen = false;
@@ -112,11 +109,9 @@ export function lineChart(container: HTMLElement, opts: ChartOptions): () => voi
         parts.push(`<text x="${width - m.right + 16}" y="${e.yy}" dy="0.32em" fill="var(--ink-2)" font-size="12">${escapeHtml(e.s.label)}</text>`);
       }
     }
-    // y-axis label
     if (!opts.compact) {
       parts.push(`<text transform="translate(12 ${(m.top + height - m.bottom) / 2}) rotate(-90)" text-anchor="middle" fill="var(--muted)" font-size="11">${escapeHtml(opts.yLabel)}</text>`);
     }
-    // crosshair layer
     parts.push('<g class="hover-layer"></g>');
 
     const el = document.createElementNS(NS, 'svg');

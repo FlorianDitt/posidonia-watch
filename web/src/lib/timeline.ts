@@ -275,7 +275,6 @@ const sameRange = (a: Range, b: Range) => a === b || (a !== null && b !== null &
 
 /** Width of one month slot in px (bar + gap). */
 const MONTH_PX = 10;
-/** Dragging within this many px of the strip's visible edge scrolls it. */
 const EDGE_PX = 24;
 
 /** Year labels at each January, plus the first month when the first January is far enough away. */

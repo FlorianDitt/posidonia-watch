@@ -1,4 +1,3 @@
-// Client-side map for the home page. Loaded only by src/pages/index.astro.
 import * as maplibregl from 'maplibre-gl';
 import type { ExpressionSpecification, GeoJSONSource, MapGeoJSONFeature } from 'maplibre-gl';
 import type * as GeoJSON from 'geojson';
@@ -100,8 +99,6 @@ function setStatus(msg: string | null) {
   el.hidden = false;
   el.innerHTML = `<p class="pointer-events-auto max-w-sm rounded-lg bg-surface/95 px-4 py-3 text-center text-sm text-ink-2 shadow">${msg}</p>`;
 }
-
-// ---------- data -> features ----------
 
 function buildHexGeojson(h: Hexes): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
@@ -323,8 +320,6 @@ function renderLegend() {
   el.title = 'Classes are quantiles of non-zero cells';
 }
 
-// ---------- popups ----------
-
 function hexPopupHtml(i: number): string {
   const h = hexes!;
   const row = (label: string, value: string) => `<tr><th class="py-0.5 pr-3 text-left font-normal text-muted">${label}</th><td class="py-0.5 text-right tabular font-medium">${value}</td></tr>`;
@@ -351,8 +346,6 @@ function pointPopupHtml(f: MapGeoJSONFeature): string {
     <div>${fmtNum(p.L, 1)} m${large ? ' <span class="font-semibold" style="color:var(--point-large)">· large</span>' : ''}</div>
     <div class="text-muted">${escapeHtml(countryName(p.c))}</div></div>`;
 }
-
-// ---------- map ----------
 
 export async function initMap() {
   const [m, hx, hm, hs, ts] = await Promise.all([
@@ -496,7 +489,6 @@ export async function initMap() {
     }
   }
 
-  /** Single boats: selected months, and only the size classes whose checkbox is on. */
   function applyPointFilter() {
     if (!map.getLayer('points')) return;
     const sel = selectedMonthIdx();
@@ -573,7 +565,6 @@ export async function initMap() {
   darkQuery.addEventListener('change', onTheme);
   window.addEventListener('themechange', onTheme);
 
-  // ----- hover & click -----
   let hoveredId: number | null = null;
   const canHover = window.matchMedia('(hover: hover)').matches;
 
@@ -620,7 +611,6 @@ export async function initMap() {
     }
   });
 
-  // ----- controls -----
   const panel = $('panel');
   const toggle = $('panel-toggle');
   const setOpen = (open: boolean) => {
@@ -638,7 +628,6 @@ export async function initMap() {
     setOpen(true);
   }));
 
-  // ----- time: timeline brush + season filter -----
   const seasonButtons = document.querySelectorAll<HTMLButtonElement>('#season-group button');
   const timelineValues = () => {
     const series = state.metric === 'large_on_posidonia' ? ts?.large_on_posidonia : ts?.anchored_on_posidonia;
@@ -721,7 +710,6 @@ export async function initMap() {
 
   document.querySelectorAll<HTMLInputElement>('input[name="metric"]').forEach((r) =>
     r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; update(); } }));
-  // clicking the selected season again goes back to all seasons
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
     const s = b.dataset.season as Season;
     state.season = s === state.season ? 'ALL' : s;
@@ -759,7 +747,6 @@ export async function initMap() {
       ensurePoints();
     });
   }
-  // ----- hotspots -----
   const list = $('hotspot-list');
   if (!hs || !Array.isArray(hs) || hs.length === 0) {
     list.innerHTML = '<li class="px-2 py-4 text-center text-xs text-muted">No hotspots published yet.</li>';
