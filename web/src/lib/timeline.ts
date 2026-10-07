@@ -24,11 +24,17 @@ export function createTimeline(
   let range: Range = null;
   let isActive: (c: number) => boolean = () => true;
 
+  // Each month gets a fixed slot, so long spans scroll sideways instead of shrinking the bars.
   root.innerHTML = `
-    <div class="tl-bars" ${opts.interactive ? 'tabindex="0"' : 'aria-disabled="true"'}>
-      ${months.map((_, c) => `<div class="tl-bar" data-c="${c}"><span></span></div>`).join('')}
-    </div>
-    <div class="tl-axis" aria-hidden="true">${axisLabels(months)}</div>`;
+    <div class="tl-scroll">
+      <div class="tl-track" style="min-width:max(100%, ${n * MONTH_PX}px)">
+        <div class="tl-bars" ${opts.interactive ? 'tabindex="0"' : 'aria-disabled="true"'}>
+          ${months.map((_, c) => `<div class="tl-bar" data-c="${c}"><span></span></div>`).join('')}
+        </div>
+        <div class="tl-axis" aria-hidden="true">${axisLabels(months)}</div>
+      </div>
+    </div>`;
+  const scrollEl = root.querySelector<HTMLElement>('.tl-scroll')!;
   const barsEl = root.querySelector<HTMLElement>('.tl-bars')!;
   const bars = Array.from(barsEl.children) as HTMLElement[];
 
@@ -44,6 +50,17 @@ export function createTimeline(
       b.classList.toggle('tl-on', inRange && isActive(c));
       b.title = opts.title(c);
     });
+  }
+
+  /** Scroll the range into view (centred) unless it is already fully visible. */
+  function reveal(r: Range) {
+    if (r === null) return;
+    const w = barsEl.clientWidth / n;
+    const left = r[0] * w;
+    const right = (r[1] + 1) * w;
+    const { scrollLeft, clientWidth } = scrollEl;
+    if (left >= scrollLeft && right <= scrollLeft + clientWidth) return;
+    scrollEl.scrollTo({ left: (left + right) / 2 - clientWidth / 2, behavior: 'smooth' });
   }
 
   if (opts.interactive) {
@@ -83,7 +100,12 @@ export function createTimeline(
       anchor = -1;
     };
     barsEl.addEventListener('pointerup', end);
-    barsEl.addEventListener('pointercancel', end);
+    // touch swipes scroll the timeline (touch-action: pan-x), which cancels the pointer: undo the tap selection
+    barsEl.addEventListener('pointercancel', () => {
+      if (anchor < 0) return;
+      anchor = -1;
+      set(before);
+    });
 
     barsEl.addEventListener('keydown', (e) => {
       const clamp = (c: number) => Math.min(n - 1, Math.max(0, c));
@@ -100,16 +122,22 @@ export function createTimeline(
       if (next === undefined) return;
       e.preventDefault();
       set(next);
+      reveal(next);
     });
   }
 
   paint();
+  // start at the most recent months
+  requestAnimationFrame(() => { scrollEl.scrollLeft = scrollEl.scrollWidth; });
   return {
     setValues(v) { values = v; paint(); },
-    setRange(r) { range = r; paint(); },
+    setRange(r) { range = r; paint(); reveal(r); },
     setActive(f) { isActive = f; paint(); },
   };
 }
+
+/** Width of one month slot in px (bar + gap). */
+const MONTH_PX = 10;
 
 /** Year labels at each January, plus the first month when the first January is far enough away. */
 function axisLabels(months: string[]): string {
@@ -119,9 +147,7 @@ function axisLabels(months: string[]): string {
   months.forEach((m, c) => {
     const labelFirst = c === 0 && (firstJan < 0 || firstJan >= 3);
     if (!m.endsWith('-01') && !labelFirst) return;
-    const pos = c / n;
-    const style = pos > 0.85 ? 'right:0' : `left:${(pos * 100).toFixed(2)}%`;
-    out.push(`<span style="${style}">${m.slice(0, 4)}</span>`);
+    out.push(`<span style="left:${((c / n) * 100).toFixed(2)}%">${m.slice(0, 4)}</span>`);
   });
   return out.join('');
 }
