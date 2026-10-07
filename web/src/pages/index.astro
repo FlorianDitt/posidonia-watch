@@ -139,7 +139,6 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     color: var(--ink);
   }
   .tab:hover { color: var(--ink); }
-  /* Segmented control: options share one tile, the selected one is highlighted. */
   .segs {
     display: grid;
     gap: 2px;
@@ -322,7 +321,6 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .timeline :global(.tl-handle[data-h='0']) { left: -0.4375rem; }
   .timeline :global(.tl-handle[data-h='1']) { right: -0.4375rem; }
   .timeline :global(.tl-plot) { padding-bottom: 1.25rem; }
-  /* Collapsible panel sections, each its own solid tile; several can be open at once. */
   .sec {
     border: 1px solid var(--line);
     border-radius: 0.75rem;
