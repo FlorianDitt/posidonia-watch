@@ -70,12 +70,15 @@ interface State {
   season: SeasonSel;
   showHexes: boolean;
   showPosidonia: boolean;
-  showPoints: boolean;
+  /** Single boats shorter than the large-boat length (blue). */
+  showSmall: boolean;
+  /** Single boats at or above the large-boat length (pink). */
+  showLarge: boolean;
   /** Selected calendar months (indices into `calendar`), null = all. */
   range: Range;
 }
 
-const state: State = { metric: 'on_posidonia', season: 'ALL', showHexes: true, showPosidonia: true, showPoints: true, range: null };
+const state: State = { metric: 'on_posidonia', season: 'ALL', showHexes: true, showPosidonia: true, showSmall: true, showLarge: true, range: null };
 
 let meta: Meta | null = null;
 let hexes: Hexes | null = null;
@@ -463,7 +466,7 @@ export async function initMap() {
       map.addSource('points', { type: 'geojson', data: pointsGeojson ?? { type: 'FeatureCollection', features: [] } });
       map.addLayer({
         id: 'points', type: 'circle', source: 'points', minzoom: POINTS_MINZOOM,
-        layout: { visibility: state.showPoints ? 'visible' : 'none', 'circle-sort-key': ['get', 'L'] },
+        layout: { visibility: state.showSmall || state.showLarge ? 'visible' : 'none', 'circle-sort-key': ['get', 'L'] },
         paint: {
           'circle-color': ['case', ['>=', ['get', 'L'], largeLen], cssVar('--point-large'), cssVar('--point-small')],
           'circle-radius': ['interpolate', ['linear'], ['zoom'],
@@ -474,14 +477,20 @@ export async function initMap() {
           'circle-opacity': 0.9,
         },
       });
-      applyMonthFilter();
+      applyPointFilter();
     }
   }
 
-  function applyMonthFilter() {
+  /** Single boats: selected months, and only the size classes whose checkbox is on. */
+  function applyPointFilter() {
     if (!map.getLayer('points')) return;
     const sel = selectedMonthIdx();
-    map.setFilter('points', sel === null ? null : ['in', ['get', 'm'], ['literal', sel]]);
+    const conds: unknown[] = [];
+    if (sel !== null) conds.push(['in', ['get', 'm'], ['literal', sel]]);
+    if (!state.showSmall) conds.push(['>=', ['get', 'L'], largeLen]);
+    if (!state.showLarge) conds.push(['<', ['get', 'L'], largeLen]);
+    map.setFilter('points', conds.length ? (['all', ...conds] as ExpressionSpecification) : null);
+    map.setLayoutProperty('points', 'visibility', state.showSmall || state.showLarge ? 'visible' : 'none');
   }
 
   function refreshHexColors() {
@@ -507,7 +516,7 @@ export async function initMap() {
   }
 
   async function ensurePoints() {
-    if (pointsGeojson || pointsLoading || !state.showPoints || map.getZoom() < POINTS_MINZOOM - 1) return;
+    if (pointsGeojson || pointsLoading || !(state.showSmall || state.showLarge) || map.getZoom() < POINTS_MINZOOM - 1) return;
     pointsLoading = true;
     const p = await loadJson<Points>('points.json');
     pointsGeojson = p ? buildPointsGeojson(p) : { type: 'FeatureCollection', features: [] };
@@ -675,7 +684,7 @@ export async function initMap() {
   function update() {
     updateSeasonButtons();
     refreshHexColors();
-    applyMonthFilter();
+    applyPointFilter();
     timeline.setRange(state.range);
     timeline.setActive((c) => calendar[c].idx >= 0 && (state.season === 'ALL' || seasonOf(calendar[c].month) === state.season));
     timeline.setValues(timelineValues());
@@ -714,9 +723,14 @@ export async function initMap() {
     setVisible(['posidonia-fill', 'posidonia-line'], state.showPosidonia);
     ensurePosidonia();
   });
-  $<HTMLInputElement>('toggle-points').addEventListener('change', (e) => {
-    state.showPoints = (e.target as HTMLInputElement).checked;
-    setVisible(['points'], state.showPoints);
+  $<HTMLInputElement>('toggle-small').addEventListener('change', (e) => {
+    state.showSmall = (e.target as HTMLInputElement).checked;
+    applyPointFilter();
+    ensurePoints();
+  });
+  $<HTMLInputElement>('toggle-large').addEventListener('change', (e) => {
+    state.showLarge = (e.target as HTMLInputElement).checked;
+    applyPointFilter();
     ensurePoints();
   });
   // ----- hotspots -----
