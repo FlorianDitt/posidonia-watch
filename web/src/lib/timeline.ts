@@ -44,8 +44,9 @@ export function createTimeline(
             ${months.map((_, c) => `<div class="tl-bar" data-c="${c}"><span></span></div>`).join('')}
           </div>
           <div class="tl-frame" hidden aria-hidden="true">
-            <span class="tl-handle" data-h="0"></span><span class="tl-handle" data-h="1"></span><span class="tl-win-label"></span>
+            <span class="tl-handle" data-h="0"></span><span class="tl-handle" data-h="1"></span>
           </div>
+          <span class="tl-win-label" hidden aria-hidden="true"></span>
         </div>
       </div>
     </div>`;
@@ -70,13 +71,23 @@ export function createTimeline(
       b.classList.toggle('tl-in', range !== null && range[1] > range[0] && inRange);
       b.title = opts.title(c);
     });
-    winEl.hidden = frameEl.hidden = range === null;
+    winEl.hidden = frameEl.hidden = winLabel.hidden = range === null;
     if (range === null) return;
     for (const el of [winEl, frameEl]) {
       el.style.left = `${(range[0] / n) * 100}%`;
       el.style.width = `${((range[1] - range[0] + 1) / n) * 100}%`;
     }
     winLabel.textContent = opts.label(range);
+    placeLabel();
+  }
+
+  /** Centre the label under the window, but keep it inside the strip when the window is narrow or at an end. */
+  function placeLabel() {
+    if (range === null) return;
+    const w = barsEl.clientWidth;
+    const half = winLabel.offsetWidth / 2;
+    const mid = ((range[0] + range[1] + 1) / 2 / n) * w;
+    winLabel.style.left = `${w > 2 * half ? Math.min(w - half, Math.max(half, mid)) : mid}px`;
   }
 
   /** Scroll the range into view (centred) unless it is already fully visible. */
@@ -192,13 +203,15 @@ export function createTimeline(
   paint();
   // Start at the selected range, else the most recent months. The timeline usually starts hidden (closed
   // section, collapsed panel) and has no width to scroll yet, so wait until it is first laid out.
-  const firstLayout = new ResizeObserver(() => {
+  let laidOut = false;
+  new ResizeObserver(() => {
     if (scrollEl.clientWidth === 0) return;
-    firstLayout.disconnect();
+    placeLabel();
+    if (laidOut) return;
+    laidOut = true;
     if (range) reveal(range, 'instant');
     else scrollEl.scrollLeft = scrollEl.scrollWidth;
-  });
-  firstLayout.observe(scrollEl);
+  }).observe(scrollEl);
   return {
     setValues(v) { values = v; paint(); },
     setRange(r) {

@@ -277,11 +277,13 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     border-radius: 0.375rem;
   }
   .timeline :global(.tl-win) { z-index: 1; background: var(--tl-win-bg); }
+  /* positioned by timeline.ts: centred under the window, clamped to the strip */
   .timeline :global(.tl-win-label) {
     position: absolute;
-    bottom: 0;
-    left: 50%;
+    z-index: 3;
+    bottom: -0.0625rem;
     transform: translateX(-50%);
+    pointer-events: none;
     padding: 0 0.25rem;
     border-radius: 0.25rem;
     background: var(--tl-win-bg);
