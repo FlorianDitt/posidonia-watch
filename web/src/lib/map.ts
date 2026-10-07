@@ -68,13 +68,14 @@ const isDark = () =>
 interface State {
   metric: Metric;
   season: SeasonSel;
+  showHexes: boolean;
   showPosidonia: boolean;
   showPoints: boolean;
   /** Selected calendar months (indices into `calendar`), null = all. */
   range: Range;
 }
 
-const state: State = { metric: 'on_posidonia', season: 'ALL', showPosidonia: true, showPoints: true, range: null };
+const state: State = { metric: 'on_posidonia', season: 'ALL', showHexes: true, showPosidonia: true, showPoints: true, range: null };
 
 let meta: Meta | null = null;
 let hexes: Hexes | null = null;
@@ -436,6 +437,7 @@ export async function initMap() {
           'fill-color': fillColorExpr(),
           'fill-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1.5, 0, DOTS_MAXZOOM, 0.85, 10, 0.7, 12, 0.25],
         },
+        layout: { visibility: state.showHexes ? 'visible' : 'none' },
       }, before);
       map.addLayer({
         id: 'hex-line', type: 'line', source: 'hexes',
@@ -446,13 +448,14 @@ export async function initMap() {
             8, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0.5],
             12, ['case', ['boolean', ['feature-state', 'hover'], false], 2.5, 1]],
         },
+        layout: { visibility: state.showHexes ? 'visible' : 'none' },
       }, before);
     }
     if (hexCentroids && !map.getSource('hex-centroids')) {
       map.addSource('hex-centroids', { type: 'geojson', data: hexCentroids });
       map.addLayer({
         id: 'hex-dots', type: 'circle', source: 'hex-centroids', maxzoom: DOTS_MAXZOOM,
-        layout: { 'circle-sort-key': ['to-number', ['get', VALUE_KEY]] },
+        layout: { visibility: state.showHexes ? 'visible' : 'none', 'circle-sort-key': ['to-number', ['get', VALUE_KEY]] },
         paint: dotPaint(),
       }, before);
     }
@@ -694,14 +697,26 @@ export async function initMap() {
   });
   update();
 
+  const setVisible = (ids: string[], on: boolean) => {
+    for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+  };
+  $<HTMLInputElement>('toggle-hexes').addEventListener('change', (e) => {
+    state.showHexes = (e.target as HTMLInputElement).checked;
+    setVisible(['hex-fill', 'hex-line', 'hex-dots'], state.showHexes);
+    if (!state.showHexes) {
+      setHover(null);
+      hover.remove();
+      if (pinnedHex !== null) popup.remove();
+    }
+  });
   $<HTMLInputElement>('toggle-posidonia').addEventListener('change', (e) => {
     state.showPosidonia = (e.target as HTMLInputElement).checked;
-    for (const id of ['posidonia-fill', 'posidonia-line']) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', state.showPosidonia ? 'visible' : 'none');
+    setVisible(['posidonia-fill', 'posidonia-line'], state.showPosidonia);
     ensurePosidonia();
   });
   $<HTMLInputElement>('toggle-points').addEventListener('change', (e) => {
     state.showPoints = (e.target as HTMLInputElement).checked;
-    if (map.getLayer('points')) map.setLayoutProperty('points', 'visibility', state.showPoints ? 'visible' : 'none');
+    setVisible(['points'], state.showPoints);
     ensurePoints();
   });
   // ----- hotspots -----

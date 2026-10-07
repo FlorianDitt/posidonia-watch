@@ -96,6 +96,9 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
           <summary><span class="sec-title">Map layers</span><span class="sec-value"></span><span class="chev" aria-hidden="true">▾</span></summary>
           <fieldset class="sec-body space-y-3">
             <legend class="sr-only">Show on map</legend>
+            <label class="flex items-center gap-2"><input type="checkbox" id="toggle-hexes" checked class="accent-[var(--sea)]" />
+              <span class="inline-block h-3 w-4 rounded-sm" style="background:linear-gradient(to right, var(--ramp-0), var(--ramp-4))"></span>
+              <span>Anchoring pressure <span class="text-xs text-muted">(hexagons)</span></span></label>
             <label class="flex items-center gap-2"><input type="checkbox" id="toggle-posidonia" checked class="accent-[var(--seagrass)]" />
               <span class="inline-block h-3 w-4 rounded-sm border border-seagrass bg-seagrass/30"></span>
               <span>Seagrass meadows</span></label>
