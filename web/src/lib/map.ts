@@ -631,11 +631,12 @@ export async function initMap() {
     for (let c = a; c <= b; c++) if (calendar[c]?.idx >= 0) avail.add(seasonOf(calendar[c].month));
     if (state.season !== 'ALL' && !avail.has(state.season)) state.season = 'ALL';
     seasonButtons.forEach((btn) => {
-      const ss = btn.dataset.season as SeasonSel;
-      btn.setAttribute('aria-pressed', String(ss === state.season));
-      if (ss === 'ALL') return;
+      const ss = btn.dataset.season as Season;
+      const on = ss === state.season;
+      btn.setAttribute('aria-pressed', String(on));
       btn.disabled = !avail.has(ss);
-      btn.title = avail.has(ss) ? SEASON_LABEL[ss] : `${SEASON_LABEL[ss]}: no data in the selected months`;
+      btn.title = !avail.has(ss) ? `${SEASON_LABEL[ss]}: no data in the selected months`
+        : on ? `${SEASON_LABEL[ss]}: click again to show all seasons` : SEASON_LABEL[ss];
     });
   }
 
@@ -683,7 +684,7 @@ export async function initMap() {
     r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; update(); } }));
   // clicking the selected season again goes back to all seasons
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
-    const s = b.dataset.season as SeasonSel;
+    const s = b.dataset.season as Season;
     state.season = s === state.season ? 'ALL' : s;
     update();
   }));

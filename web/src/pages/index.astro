@@ -43,7 +43,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
           <div class="sec-body space-y-4">
             <fieldset id="metric-group">
               <legend class="sr-only">Colour hexagons by</legend>
-              <div class="grid grid-cols-3 gap-1">
+              <div class="segs grid-cols-3">
                 <label class="seg seg-radio"><input type="radio" name="metric" value="on_posidonia" checked class="sr-only" />Boats</label>
                 <label class="seg seg-radio"><input type="radio" name="metric" value="large_on_posidonia" class="sr-only" />Large</label>
                 <label class="seg seg-radio"><input type="radio" name="metric" value="density" class="sr-only" />Density</label>
@@ -81,11 +81,10 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
             </div>
             <div>
               <h3 class="sub">Season</h3>
-              <div class="grid grid-cols-5 gap-1" id="season-group" role="group" aria-label="Season">
-                {['ALL', 'DJF', 'MAM', 'JJA', 'SON'].map((s) => (
-                  <button type="button" data-season={s} aria-pressed={s === 'ALL' ? 'true' : 'false'} class="seg"
-                    title={{ ALL: 'All seasons', DJF: 'Winter: Dec–Feb', MAM: 'Spring: Mar–May', JJA: 'Summer: Jun–Aug', SON: 'Autumn: Sep–Nov' }[s]}>
-                    {{ ALL: 'All', DJF: 'Win', MAM: 'Spr', JJA: 'Sum', SON: 'Aut' }[s]}
+              <div class="segs grid-cols-4" id="season-group" role="group" aria-label="Season (click again to show all seasons)">
+                {['DJF', 'MAM', 'JJA', 'SON'].map((s) => (
+                  <button type="button" data-season={s} aria-pressed="false" class="seg">
+                    {{ DJF: 'Winter', MAM: 'Spring', JJA: 'Summer', SON: 'Autumn' }[s]}
                   </button>
                 ))}
               </div>
@@ -134,21 +133,44 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     color: var(--ink);
   }
   .tab:hover { color: var(--ink); }
-  .seg {
+  /* Segmented control: options share one tile, the selected one is highlighted. */
+  .segs {
+    display: grid;
+    gap: 2px;
+    padding: 2px;
     border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--surface-2);
+  }
+  .seg {
     border-radius: 0.375rem;
     padding: 0.3rem 0;
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--ink-2);
-    background: var(--surface);
+    transition: background-color 0.1s, color 0.1s;
   }
+  .seg:hover:not(:disabled) { color: var(--ink); }
   .seg[aria-pressed='true'] {
     background: var(--sea);
-    border-color: var(--sea);
     color: var(--surface);
   }
-  .seg:disabled { opacity: 0.5; }
+  .seg:disabled { opacity: 0.45; }
+  .seg-radio {
+    display: flex;
+    cursor: pointer;
+    justify-content: center;
+    padding: 0.4rem 0;
+    font-size: 0.8125rem;
+  }
+  .seg-radio:has(input:checked) {
+    background: var(--sea);
+    color: var(--surface);
+  }
+  .seg-radio:has(input:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
   /* Year dropdown (behaviour in src/lib/select.ts) */
   .dd-btn {
     display: flex;
@@ -192,22 +214,6 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   }
   .dd-list li.dd-active { background: var(--surface-2); color: var(--ink); }
   .dd-list li[aria-selected='true'] { background: var(--sea); color: var(--surface); font-weight: 500; }
-  .seg-radio {
-    display: flex;
-    cursor: pointer;
-    justify-content: center;
-    padding: 0.4rem 0;
-    font-size: 0.8125rem;
-  }
-  .seg-radio:has(input:checked) {
-    background: var(--sea);
-    border-color: var(--sea);
-    color: var(--surface);
-  }
-  .seg-radio:has(input:focus-visible) {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
   /* Timeline bars are rendered by src/lib/timeline.ts, hence :global() */
   .timeline { --tl-win-bg: color-mix(in srgb, var(--sea) 12%, var(--surface)); }
   .timeline :global(.tl-scroll) {
