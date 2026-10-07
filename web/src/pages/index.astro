@@ -36,8 +36,8 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
       </button>
     </div>
 
-    <div id="panel-body" class="panel-body min-h-0 flex-1 overflow-y-auto">
-      <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="px-4 pb-4">
+    <div id="panel-body" class="panel-body min-h-0 flex-1 overflow-y-auto bg-bg">
+      <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="space-y-2 p-2.5">
         <details class="sec" open>
           <summary><span class="sec-title">Legend</span><span id="sum-metric" class="sec-value">Boats</span><span class="chev" aria-hidden="true">▾</span></summary>
           <div class="sec-body space-y-4">
@@ -112,7 +112,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
           </fieldset>
         </details>
 
-        <p class="pt-4 text-xs leading-relaxed text-muted">
+        <p class="px-1.5 pt-1 text-xs leading-relaxed text-muted">
           Shows anchoring pressure, not proven violations.{' '}
           <a class="text-sea underline" href={withBase('about/')}>How this works</a>
           <span class="mt-1 block tabular">Updated {meta ? fmtDate(meta.generated_at) : '–'}</span>
@@ -322,13 +322,19 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .timeline :global(.tl-handle[data-h='0']) { left: -0.4375rem; }
   .timeline :global(.tl-handle[data-h='1']) { right: -0.4375rem; }
   .timeline :global(.tl-plot) { padding-bottom: 1.25rem; }
-  /* Collapsible panel sections; several can be open at once. */
-  .sec { border-bottom: 1px solid var(--line); }
+  /* Collapsible panel sections, each its own solid tile; several can be open at once. */
+  .sec {
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0 0.875rem;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  }
   .sec summary {
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
-    padding: 0.8rem 0;
+    padding: 0.75rem 0;
     cursor: pointer;
     list-style: none;
   }
@@ -337,7 +343,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .sec-title { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
   .sec summary:hover .sec-title { color: var(--ink); }
   .sec-value { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 0.8125rem; color: var(--ink); }
-  .sec-body { padding-bottom: 1rem; }
+  .sec-body { padding-bottom: 0.875rem; }
   .sub { margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--muted); }
   .chev { font-size: 0.7rem; color: var(--muted); transition: transform 0.15s; }
   .sec[open] > summary .chev { transform: rotate(180deg); }
