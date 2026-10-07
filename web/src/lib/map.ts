@@ -490,7 +490,6 @@ export async function initMap() {
     if (!state.showSmall) conds.push(['>=', ['get', 'L'], largeLen]);
     if (!state.showLarge) conds.push(['<', ['get', 'L'], largeLen]);
     map.setFilter('points', conds.length ? (['all', ...conds] as ExpressionSpecification) : null);
-    map.setLayoutProperty('points', 'visibility', state.showSmall || state.showLarge ? 'visible' : 'none');
   }
 
   function refreshHexColors() {
@@ -723,16 +722,14 @@ export async function initMap() {
     setVisible(['posidonia-fill', 'posidonia-line'], state.showPosidonia);
     ensurePosidonia();
   });
-  $<HTMLInputElement>('toggle-small').addEventListener('change', (e) => {
-    state.showSmall = (e.target as HTMLInputElement).checked;
-    applyPointFilter();
-    ensurePoints();
-  });
-  $<HTMLInputElement>('toggle-large').addEventListener('change', (e) => {
-    state.showLarge = (e.target as HTMLInputElement).checked;
-    applyPointFilter();
-    ensurePoints();
-  });
+  for (const [id, key] of [['toggle-small', 'showSmall'], ['toggle-large', 'showLarge']] as const) {
+    $<HTMLInputElement>(id).addEventListener('change', (e) => {
+      state[key] = (e.target as HTMLInputElement).checked;
+      setVisible(['points'], state.showSmall || state.showLarge);
+      applyPointFilter();
+      ensurePoints();
+    });
+  }
   // ----- hotspots -----
   const list = $('hotspot-list');
   if (!hs || !Array.isArray(hs) || hs.length === 0) {
