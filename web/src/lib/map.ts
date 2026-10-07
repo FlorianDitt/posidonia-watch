@@ -629,7 +629,7 @@ export async function initMap() {
     });
   }
 
-  const yearButtons = document.querySelectorAll<HTMLButtonElement>('#year-group button');
+  const yearSelect = $<HTMLSelectElement>('year-select');
   const METRIC_SHORT: Record<Metric, string> = { on_posidonia: 'Boats', large_on_posidonia: `Boats ≥ ${largeLen} m`, density: 'Density' };
 
   /** Year whose full span equals the selected range, 'ALL' for no range, null for a custom range. */
@@ -644,10 +644,8 @@ export async function initMap() {
   /** Section headers show the current value, so a collapsed section still tells what is filtered. */
   function renderSummaries() {
     const year = selectedYear();
-    yearButtons.forEach((b) => {
-      b.setAttribute('aria-pressed', String(b.dataset.year === year));
-      if (b.dataset.year !== 'ALL') b.disabled = monthly === null;
-    });
+    yearSelect.value = year ?? 'CUSTOM';
+    yearSelect.disabled = monthly === null;
     $('sum-metric').textContent = METRIC_SHORT[state.metric];
     const when = year === 'ALL' ? 'All' : year ?? rangeLabel();
     $('sum-time').textContent = state.season === 'ALL' ? when
@@ -673,10 +671,10 @@ export async function initMap() {
     state.season = b.dataset.season as SeasonSel;
     update();
   }));
-  yearButtons.forEach((b) => b.addEventListener('click', () => {
-    state.range = b.dataset.year === 'ALL' ? null : yearRange(b.dataset.year!);
+  yearSelect.addEventListener('change', () => {
+    state.range = yearSelect.value === 'ALL' ? null : yearRange(yearSelect.value);
     update();
-  }));
+  });
   $('time-reset').addEventListener('click', () => {
     state.range = null;
     update();
