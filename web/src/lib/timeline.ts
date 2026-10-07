@@ -223,7 +223,9 @@ function axisLabels(months: string[]): string {
   months.forEach((m, c) => {
     const labelFirst = c === 0 && (firstJan < 0 || firstJan >= 3);
     if (!m.endsWith('-01') && !labelFirst) return;
-    out.push(`<span style="left:${((c / n) * 100).toFixed(2)}%">${m.slice(0, 4)}</span>`);
+    // a year starting in the last few slots would run past the end of the track, so pin it to the right edge
+    const style = n - c < 3 ? 'right:0' : `left:${((c / n) * 100).toFixed(2)}%`;
+    out.push(`<span style="${style}">${m.slice(0, 4)}</span>`);
   });
   return out.join('');
 }
