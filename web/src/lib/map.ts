@@ -773,9 +773,11 @@ export async function initMap() {
       if (isNarrow()) setOpen(false);
       map.flyTo({ center: [h.lon, h.lat], zoom: 11.5, essential: true, padding: isNarrow() ? 0 : { left: 340, top: 0, right: 0, bottom: 0 } });
       const i = hexIndex.get(h.h3);
-      // with the hexagon layer switched off, just fly there: a hex popup would describe a cell that is not drawn
-      if (i !== undefined && state.showHexes) {
+      if (i !== undefined) {
         map.once('moveend', () => {
+          // with the hexagon layer off (also if switched off during the flight), a hex popup would describe a
+          // cell that is not drawn, so just arrive there
+          if (!state.showHexes) return;
           popup.setLngLat([h.lon, h.lat]).setHTML(hexPopupHtml(i)).addTo(map);
           pinned = true;
           pinnedHex = i;
