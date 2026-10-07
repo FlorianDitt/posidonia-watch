@@ -1,0 +1,117 @@
+name: Update data
+
+# Fetches GFW releases that are not cached yet and, if there are any, rebuilds
+# web/public/data and opens an auto-merging pull request. Merging it deploys the site.
+#
+# The filtered cache (pipeline/data/cache, ~650 MB) lives as a tarball on the
+# `pipeline-cache` release, because `build` aggregates every cached month and
+# actions/cache evicts entries unused for 7 days.
+#
+# Needs the secret PIPELINE_PAT: a fine-grained token for this repository with
+# Contents and Pull requests read/write. Pushes and pull requests made with the
+# default GITHUB_TOKEN do not trigger CI, so the required checks would never run.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"  # weekly: GFW publishes around the 19th, but irregularly
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: Rebuild the site data even if no new release was fetched
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # upload the cache tarball to the pipeline-cache release
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+env:
+  CACHE_TAG: pipeline-cache
+  CACHE_ASSET: cache.tar
+  DATA_BRANCH: data/update
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.PIPELINE_PAT || github.token }}
+
+      - uses: astral-sh/setup-uv@v10.2.0  # no floating major tag is published
+
+      - run: uv sync --locked
+        working-directory: pipeline
+
+      - name: Restore pipeline cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p pipeline/data
+          if gh release download "$CACHE_TAG" --pattern "$CACHE_ASSET" --dir "$RUNNER_TEMP"; then
+            tar -xf "$RUNNER_TEMP/$CACHE_ASSET" -C pipeline/data
+            rm "$RUNNER_TEMP/$CACHE_ASSET"
+          else
+            echo "::warning::No pipeline cache on release $CACHE_TAG – fetching everything from scratch"
+          fi
+          manifest=pipeline/data/cache/manifest.json
+          if [ -f "$manifest" ]; then cp "$manifest" "$RUNNER_TEMP/manifest.before.json"; else echo '{}' > "$RUNNER_TEMP/manifest.before.json"; fi
+
+      # Annual files take ~30 min each; whatever is left over is fetched next run.
+      - name: Fetch new GFW releases
+        working-directory: pipeline
+        run: uv run --locked posidonia-watch update --no-build --max-minutes 240
+
+      - name: List newly fetched releases
+        id: new
+        run: |
+          manifest=pipeline/data/cache/manifest.json
+          [ -f "$manifest" ] || echo '{}' > "$manifest"
+          periods=$(jq -rn --slurpfile a "$RUNNER_TEMP/manifest.before.json" --slurpfile b "$manifest" '
+            [$b[0] | to_entries[] | select($a[0][.key].record_id != .value.record_id) | .key
+             | if length == 6 then .[0:4] + "-" + .[4:6] else . end] | join(", ")')
+          echo "periods=$periods" >> "$GITHUB_OUTPUT"
+          echo "Newly fetched: ${periods:-none}"
+
+      # Saved before building, so hours of downloads survive a failed build.
+      - name: Save pipeline cache
+        if: steps.new.outputs.periods != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -cf "$RUNNER_TEMP/$CACHE_ASSET" -C pipeline/data cache
+          gh release upload "$CACHE_TAG" "$RUNNER_TEMP/$CACHE_ASSET" --clobber
+
+      - name: Build site data
+        if: steps.new.outputs.periods != '' || inputs.rebuild
+        working-directory: pipeline
+        run: uv run --locked posidonia-watch build
+
+      - name: Open data pull request
+        if: steps.new.outputs.periods != '' || inputs.rebuild
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_PAT }}
+          PERIODS: ${{ steps.new.outputs.periods }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret PIPELINE_PAT is not set; cannot open a pull request that runs CI"
+            exit 1
+          fi
+          if [ -n "$PERIODS" ]; then title="data: add GFW releases $PERIODS"; else title="data: rebuild"; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$DATA_BRANCH"
+          git add web/public/data
+          git commit -m "$title"
+          git push --force origin "$DATA_BRANCH"
+          body="Automated by the [Update data]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) workflow."
+          if [ "$(gh pr view "$DATA_BRANCH" --json state --jq .state 2>/dev/null)" = OPEN ]; then
+            gh pr edit "$DATA_BRANCH" --title "$title" --body "$body"
+          else
+            gh pr create --head "$DATA_BRANCH" --base main --title "$title" --body "$body"
+          fi
+          gh pr merge "$DATA_BRANCH" --auto --rebase
