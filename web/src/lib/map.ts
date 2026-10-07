@@ -351,14 +351,6 @@ function pointPopupHtml(f: MapGeoJSONFeature): string {
 // ---------- map ----------
 
 export async function initMap() {
-  // Browsers restore form controls on reload (and back/forward), so start from what they show, not the defaults.
-  const checked = (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)?.checked ?? true;
-  state.showHexes = checked('toggle-hexes');
-  state.showPosidonia = checked('toggle-posidonia');
-  state.showSmall = checked('toggle-small');
-  state.showLarge = checked('toggle-large');
-  const metric = document.querySelector<HTMLInputElement>('input[name="metric"]:checked')?.value;
-  if (metric) state.metric = metric as Metric;
   const [m, hx, hm, hs, ts] = await Promise.all([
     loadJson<Meta>('meta.json'),
     loadJson<Hexes>('hexes.json'),
@@ -408,6 +400,17 @@ export async function initMap() {
     console.error(e);
     return;
   }
+  // Browsers restore form controls on reload (and back/forward), so start from what they show, not the defaults.
+  // Read them after the last await: from here on the change listeners below are attached before any input can
+  // arrive, and update() at the end re-renders everything that depends on the metric.
+  const checked = (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)?.checked ?? true;
+  state.showHexes = checked('toggle-hexes');
+  state.showPosidonia = checked('toggle-posidonia');
+  state.showSmall = checked('toggle-small');
+  state.showLarge = checked('toggle-large');
+  const metric = document.querySelector<HTMLInputElement>('input[name="metric"]:checked')?.value;
+  if (metric) state.metric = metric as Metric;
+
   map.touchZoomRotate.disableRotation();
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
