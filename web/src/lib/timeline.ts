@@ -34,8 +34,9 @@ export function createTimeline(
   let values: number[] = new Array(n).fill(NaN);
   let range: Range = null;
   let isActive: (c: number) => boolean = () => true;
-  /** True while the pointer drags the range, so echoes of our own onChange don't scroll the view. */
-  let dragging = false;
+  /** Last range sent through onChange (or received from outside), so its echo back via update() is not
+   *  mistaken for an external change and does not scroll the view. */
+  let known: Range = null;
 
   // Each month gets a fixed slot, so long spans scroll sideways instead of shrinking the bars.
   root.innerHTML = `
@@ -124,7 +125,7 @@ export function createTimeline(
     let scrollFrame = 0;
     const emit = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => opts.onChange(range));
+      frame = requestAnimationFrame(() => { known = range; opts.onChange(range); });
     };
     const at = (x: number) => {
       const r = barsEl.getBoundingClientRect();
@@ -135,9 +136,7 @@ export function createTimeline(
       mode = null;
       cancelAnimationFrame(scrollFrame);
       scrollFrame = 0;
-      requestAnimationFrame(() => { dragging = false; });
     };
-    const same = (a: Range, b: [number, number]) => a !== null && a[0] === b[0] && a[1] === b[1];
 
     plotEl.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
@@ -164,7 +163,6 @@ export function createTimeline(
         anchor = c;
         set([c, c]);
       }
-      dragging = true;
       downX = lastX = e.clientX;
       plotEl.setPointerCapture(e.pointerId);
       // preventDefault stops text selection but also the focus a click would give, so the arrow keys work right away
@@ -191,7 +189,7 @@ export function createTimeline(
         if (c !== anchor) moved = true;
         next = [Math.min(anchor, c), Math.max(anchor, c)];
       }
-      if (!same(range, next)) set(next);
+      if (!sameRange(range, next)) set(next);
     }
     /** While dragging near (or past) either edge of the strip, scroll it, faster the further out the pointer is. */
     function edgeScroll() {
@@ -260,9 +258,10 @@ export function createTimeline(
   }).observe(scrollEl);
   return {
     update(next) {
-      // only external range changes (year picker, reset) scroll; the pointer already shows where the range is
+      // only external range changes (year picker, reset) scroll; for our own the pointer already shows where it is
       const r = next.range;
-      const external = r !== undefined && !dragging && !(r === range || (r && range && r[0] === range[0] && r[1] === range[1]));
+      const external = r !== undefined && !sameRange(r, known);
+      if (external) known = r;
       if (next.values) values = next.values;
       if (r !== undefined) range = r;
       if (next.isActive) isActive = next.isActive;
@@ -271,6 +270,8 @@ export function createTimeline(
     },
   };
 }
+
+const sameRange = (a: Range, b: Range) => a === b || (a !== null && b !== null && a[0] === b[0] && a[1] === b[1]);
 
 /** Width of one month slot in px (bar + gap). */
 const MONTH_PX = 10;
