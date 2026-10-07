@@ -307,13 +307,17 @@ function renderLegend() {
   const stops: string[] = [];
   for (let k = 0; k < nClasses; k++) stops.push(`${pick(k)} ${(((k + 0.5) / nClasses) * 100).toFixed(1)}%`);
   const bounds = [min, ...currentBreaks, max];
-  const ticks = bounds.map((x, k) => {
+  // a boundary printing the same as the one before (min = max, or a break equal to max) would overlap it
+  const ticks = bounds.flatMap((x, k) => {
+    if (k > 0 && f(x) === f(bounds[k - 1])) return [];
     const pos = (k / nClasses) * 100;
     const align = k === 0 ? 'items-start' : k === nClasses ? 'items-end -translate-x-full' : 'items-center -translate-x-1/2';
-    return `<div class="absolute top-0 flex flex-col ${align}" style="left:${pos.toFixed(1)}%"><span class="h-1.5 w-px bg-line"></span><span>${f(x)}</span></div>`;
+    return [`<div class="absolute top-0 flex flex-col ${align}" style="left:${pos.toFixed(1)}%"><span class="h-1.5 w-px bg-line"></span><span>${f(x)}</span></div>`];
   });
+  // a gradient needs at least two stops, so a single class is a solid bar
+  const bar = nClasses === 1 ? pick(0) : `linear-gradient(to right, ${stops.join(', ')})`;
   el.innerHTML = `
-    <div class="h-3 rounded-sm" style="background:linear-gradient(to right, ${stops.join(', ')})"></div>
+    <div class="h-3 rounded-sm" style="background:${bar}"></div>
     <div class="relative h-6">${ticks.join('')}</div>
     <div class="mt-1 flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`;
   el.title = 'Classes are quantiles of non-zero cells';
