@@ -111,7 +111,7 @@ export function fmtNum(v: number | null | undefined, digits = 2) {
   return v.toLocaleString('en-GB', { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 }
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "2025-08" -> "Aug 2025" */
 export function fmtMonth(m: string | undefined | null): string {
   if (!m || !/^\d{4}-\d{2}$/.test(m)) return m ?? '–';
