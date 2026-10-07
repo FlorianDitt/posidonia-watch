@@ -22,11 +22,11 @@
   --grid: #e3e8e6;
 
   /* Sequential pressure ramp for the hex map (low -> high) */
-  --ramp-0: #f8a161;
-  --ramp-1: #ee7b33;
+  --ramp-0: #6e2205;
+  --ramp-1: #a63c0f;
   --ramp-2: #d45a12;
-  --ramp-3: #a63c0f;
-  --ramp-4: #6e2205;
+  --ramp-3: #ee7b33;
+  --ramp-4: #f8a161;
   --hex-line: rgba(110, 34, 5, 0.35);
   --point-small: #1b5e7a;
   --point-large: #c0265e;
@@ -50,11 +50,11 @@
     --series-2: #d95926;
     --series-context: #8fa19e;
     --grid: #233437;
-    --ramp-0: #9c3a1c;
-    --ramp-1: #c9531d;
+    --ramp-0: #fdd3a2;
+    --ramp-1: #f9a55c;
     --ramp-2: #ec7a2c;
-    --ramp-3: #f9a55c;
-    --ramp-4: #fdd3a2;
+    --ramp-3: #c9531d;
+    --ramp-4: #9c3a1c;
     --hex-line: rgba(253, 211, 162, 0.3);
     --point-small: #7cc0dc;
     --point-large: #ff6fa3;
@@ -77,11 +77,11 @@
   --series-2: #d95926;
   --series-context: #8fa19e;
   --grid: #233437;
-  --ramp-0: #9c3a1c;
-  --ramp-1: #c9531d;
+  --ramp-0: #fdd3a2;
+  --ramp-1: #f9a55c;
   --ramp-2: #ec7a2c;
-  --ramp-3: #f9a55c;
-  --ramp-4: #fdd3a2;
+  --ramp-3: #c9531d;
+  --ramp-4: #9c3a1c;
   --hex-line: rgba(253, 211, 162, 0.3);
   --point-small: #7cc0dc;
   --point-large: #ff6fa3;
