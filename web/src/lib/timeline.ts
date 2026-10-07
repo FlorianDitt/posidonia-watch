@@ -112,6 +112,9 @@ export function createTimeline(
     let before: Range = null;
     let moved = false;
     let frame = 0;
+    let downX = 0;
+    let lastX = 0;
+    let scrollFrame = 0;
     const emit = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => opts.onChange(range));
@@ -121,7 +124,12 @@ export function createTimeline(
       return Math.min(n - 1, Math.max(0, Math.floor(((x - r.left) / r.width) * n)));
     };
     const set = (r: Range) => { range = r; paint(); emit(); };
-    const end = () => { mode = null; requestAnimationFrame(() => { dragging = false; }); };
+    const end = () => {
+      mode = null;
+      cancelAnimationFrame(scrollFrame);
+      scrollFrame = 0;
+      requestAnimationFrame(() => { dragging = false; });
+    };
     const same = (a: Range, b: [number, number]) => a !== null && a[0] === b[0] && a[1] === b[1];
 
     plotEl.addEventListener('pointerdown', (e) => {
@@ -146,14 +154,16 @@ export function createTimeline(
         set([c, c]);
       }
       dragging = true;
+      downX = lastX = e.clientX;
       plotEl.setPointerCapture(e.pointerId);
       // preventDefault stops text selection but also the focus a click would give, so the arrow keys work right away
       e.preventDefault();
       barsEl.focus({ preventScroll: true });
     });
-    plotEl.addEventListener('pointermove', (e) => {
-      if (mode === null) return;
-      const c = at(e.clientX);
+    /** Follow the pointer, but only over months that are on screen: hidden ones come in via edgeScroll. */
+    function track(x: number) {
+      const view = scrollEl.getBoundingClientRect();
+      const c = at(Math.min(view.right - 1, Math.max(view.left, x)));
       let next: [number, number];
       if (mode === 'move') {
         if (c === grab && !moved) return;
@@ -166,6 +176,26 @@ export function createTimeline(
         next = [Math.min(anchor, c), Math.max(anchor, c)];
       }
       if (!same(range, next)) set(next);
+    }
+    /** While dragging near (or past) either edge of the strip, scroll it, faster the further out the pointer is. */
+    function edgeScroll() {
+      scrollFrame = 0;
+      // a click near the edge that jitters by a pixel or two should not scroll
+      if (mode === null || Math.abs(lastX - downX) < 4) return;
+      const view = scrollEl.getBoundingClientRect();
+      const over = lastX < view.left + EDGE_PX ? lastX - view.left - EDGE_PX : lastX > view.right - EDGE_PX ? lastX - view.right + EDGE_PX : 0;
+      if (over === 0) return;
+      const was = scrollEl.scrollLeft;
+      scrollEl.scrollLeft += Math.sign(over) * Math.min(24, 2 + Math.abs(over) / 3);
+      if (scrollEl.scrollLeft === was) return;
+      track(lastX);
+      scrollFrame = requestAnimationFrame(edgeScroll);
+    }
+    plotEl.addEventListener('pointermove', (e) => {
+      if (mode === null) return;
+      lastX = e.clientX;
+      track(lastX);
+      if (!scrollFrame) scrollFrame = requestAnimationFrame(edgeScroll);
     });
     plotEl.addEventListener('pointerup', () => {
       if (mode === null) return;
@@ -227,6 +257,8 @@ export function createTimeline(
 
 /** Width of one month slot in px (bar + gap). */
 const MONTH_PX = 10;
+/** Dragging within this many px of the strip's visible edge scrolls it. */
+const EDGE_PX = 24;
 
 /** Year labels at each January, plus the first month when the first January is far enough away. */
 function axisLabels(months: string[]): string {
