@@ -563,10 +563,15 @@ export async function initMap() {
   });
   map.on('moveend', () => { ensurePosidonia(); ensurePoints(); });
 
-  // Follow OS theme changes: swap basemap, then re-add our layers (style.load).
-  darkQuery.addEventListener('change', async () => {
+  // swapping the basemap drops our layers; style.load re-adds them in the new palette
+  let dark = isDark();
+  const onTheme = async () => {
+    if (isDark() === dark) return;
+    dark = isDark();
     map.setStyle(await basemapStyle(), { diff: false });
-  });
+  };
+  darkQuery.addEventListener('change', onTheme);
+  window.addEventListener('themechange', onTheme);
 
   // ----- hover & click -----
   let hoveredId: number | null = null;

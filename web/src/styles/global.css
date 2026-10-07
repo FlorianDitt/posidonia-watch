@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
-/* Design tokens: calm ocean / seagrass palette. Light by default, dark via prefers-color-scheme. */
+/* dark: follows the OS unless lib/theme.ts forces a theme via data-theme */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) { @slot; }
+  }
+  &:where([data-theme="dark"], [data-theme="dark"] *) { @slot; }
+}
+
+/* Design tokens: calm ocean / seagrass palette. Light by default, dark via prefers-color-scheme or data-theme. */
 :root {
   color-scheme: light;
   --bg: #f6f7f4;
@@ -156,11 +164,9 @@ body {
   .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 52px; }
 }
 /* MapLibre controls in dark mode */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .maplibregl-ctrl-group,
-  :root:not([data-theme="light"]) .maplibregl-ctrl-attrib,
-  :root:not([data-theme="light"]) .maplibregl-ctrl-scale { background: rgba(20, 34, 37, 0.9) !important; color: var(--ink-2); border-color: var(--ink-2); }
-  :root:not([data-theme="light"]) .maplibregl-ctrl-attrib a { color: var(--ink-2); }
-  :root:not([data-theme="light"]) .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
-  :root:not([data-theme="light"]) .maplibregl-ctrl-group button + button { border-top-color: var(--line); }
+.maplibregl-ctrl-group, .maplibregl-ctrl-attrib, .maplibregl-ctrl-scale {
+  @variant dark { background: rgba(20, 34, 37, 0.9) !important; color: var(--ink-2); border-color: var(--ink-2); }
 }
+.maplibregl-ctrl-attrib a { @variant dark { color: var(--ink-2); } }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon { @variant dark { filter: invert(1); } }
+.maplibregl-ctrl-group button + button { @variant dark { border-top-color: var(--line); } }
