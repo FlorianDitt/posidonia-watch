@@ -738,12 +738,16 @@ export async function initMap() {
   if (!hs || !Array.isArray(hs) || hs.length === 0) {
     list.innerHTML = '<li class="px-2 py-4 text-center text-xs text-muted">No hotspots published yet.</li>';
   } else {
+    // number hotspots within each country (list is sorted by boats, so "France 1" is France's worst cell)
+    const perCountry = new Map<string, number>();
+    const nth = hs.map((h) => { const c = (perCountry.get(h.country) ?? 0) + 1; perCountry.set(h.country, c); return c; });
+    const coords = (h: Hotspot) => `${fmtNum(Math.abs(h.lat), 2)}° ${h.lat >= 0 ? 'N' : 'S'}, ${fmtNum(Math.abs(h.lon), 2)}° ${h.lon >= 0 ? 'E' : 'W'}`;
     list.innerHTML = hs.map((h, k) => `
       <li><button type="button" data-k="${k}" class="hs flex w-full items-start gap-3 rounded-md px-2 py-2 text-left hover:bg-surface-2">
         <span class="mt-0.5 w-5 shrink-0 text-right text-xs tabular text-muted">${k + 1}</span>
         <span class="min-w-0 flex-1">
-          <span class="block truncate font-medium text-ink">${escapeHtml(h.place ?? `${fmtNum(Math.abs(h.lat), 2)}° ${h.lat >= 0 ? 'N' : 'S'}, ${fmtNum(Math.abs(h.lon), 2)}° ${h.lon >= 0 ? 'E' : 'W'}`)}</span>
-          <span class="block text-xs text-muted">${escapeHtml(countryName(h.country))} · peak ${escapeHtml(fmtMonth(h.peak_month))}</span>
+          <span class="block truncate font-medium text-ink">${escapeHtml(countryName(h.country))} ${nth[k]}</span>
+          <span class="block truncate text-xs text-muted">${escapeHtml(h.place ? `${h.place} · ` : '')}<span class="tabular">${coords(h)}</span> · peak ${escapeHtml(fmtMonth(h.peak_month))}</span>
         </span>
         <span class="shrink-0 text-right tabular">
           <span class="block font-semibold text-ink">${fmtInt(h.on_posidonia)}</span>
