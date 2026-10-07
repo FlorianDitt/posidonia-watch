@@ -115,6 +115,8 @@ export function createTimeline(
 
     plotEl.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      // touches on the year row are left to the browser, which scrolls the strip
+      if (e.pointerType !== 'mouse' && (e.target as HTMLElement).closest('.tl-axis')) return;
       const c = at(e.clientX);
       const handle = (e.target as HTMLElement).closest<HTMLElement>('.tl-handle');
       before = range;
@@ -159,7 +161,7 @@ export function createTimeline(
       else if (mode === 'new' && !moved && before && before[0] === anchor && before[1] === anchor) set(null);
       end();
     });
-    // touch swipes on the bars scroll the timeline (touch-action: pan-x), which cancels the pointer
+    // a vertical touch swipe scrolls the page (touch-action: pan-y), which cancels the pointer
     plotEl.addEventListener('pointercancel', () => {
       if (mode === null) return;
       set(before);
