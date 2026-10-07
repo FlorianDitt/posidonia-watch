@@ -136,7 +136,9 @@ export function createTimeline(
       }
       dragging = true;
       plotEl.setPointerCapture(e.pointerId);
+      // preventDefault stops text selection but also the focus a click would give, so the arrow keys work right away
       e.preventDefault();
+      barsEl.focus({ preventScroll: true });
     });
     plotEl.addEventListener('pointermove', (e) => {
       if (mode === null) return;
