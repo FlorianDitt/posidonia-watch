@@ -507,7 +507,14 @@ export async function initMap() {
     map.setFilter('points', conds.length ? (['all', ...conds] as ExpressionSpecification) : null);
   }
 
+  /** Recolour the hexes for the current selection. While they are hidden only the legend is kept current (no
+   *  re-tiling of the big sources on every drag frame); the toggle refreshes them when they are shown again. */
   function refreshHexColors() {
+    if (!state.showHexes) {
+      currentBreaks = quantileBreaks(activeValues(), activeIsCount());
+      renderLegend();
+      return;
+    }
     writeValues();
     if (hexGeojson) (map.getSource('hexes') as GeoJSONSource | undefined)?.setData(hexGeojson);
     if (hexCentroids) (map.getSource('hex-centroids') as GeoJSONSource | undefined)?.setData(hexCentroids);
@@ -725,6 +732,7 @@ export async function initMap() {
   };
   $<HTMLInputElement>('toggle-hexes').addEventListener('change', (e) => {
     state.showHexes = (e.target as HTMLInputElement).checked;
+    if (state.showHexes) refreshHexColors();
     setVisible(['hex-fill', 'hex-line', 'hex-dots'], state.showHexes);
     if (!state.showHexes) {
       setHover(null);
