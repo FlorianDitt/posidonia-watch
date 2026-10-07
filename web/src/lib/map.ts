@@ -7,7 +7,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { cellToBoundary, cellToLatLng } from 'h3-js';
 import {
-  loadJson, fmtInt, fmtNum, fmtMonth, escapeHtml, withBase, MONTH_NAMES,
+  loadJson, fmtInt, fmtNum, fmtMonth, escapeHtml, withBase,
   SEASON_LABEL, seasonOf,
   type Meta, type Hexes, type HexesMonthly, type Points, type Hotspot, type Timeseries, type Season,
 } from './data';
@@ -651,7 +651,7 @@ export async function initMap() {
       const yr = yearRange(ma.slice(0, 4));
       if (yr && yr[0] === a && yr[1] === b) return ma.slice(0, 4);
       if (a === b) return fmtMonth(ma);
-      if (ma.slice(0, 4) === mb.slice(0, 4)) return `${MONTH_NAMES[Number(ma.slice(5)) - 1]}–${fmtMonth(mb)}`;
+      if (ma.slice(0, 4) === mb.slice(0, 4)) return `${fmtMonth(ma).slice(0, 3)}–${fmtMonth(mb)}`;
       return `${fmtMonth(ma)} – ${fmtMonth(mb)}`;
     },
     onChange: (r) => { state.range = r; update(); },
