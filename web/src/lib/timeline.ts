@@ -1,4 +1,5 @@
 // Month timeline brush for the map panel: one bar per calendar month, drag (or arrow keys) to pick a range.
+// The selected range is drawn as a window with handles: drag a handle to resize it, drag inside it to move it.
 
 /** Inclusive [start, end] indices into the calendar, or null for "all months". */
 export type Range = [number, number] | null;
@@ -17,7 +18,13 @@ export interface Timeline {
 export function createTimeline(
   root: HTMLElement,
   months: string[],
-  opts: { interactive: boolean; title: (c: number) => string; onChange: (r: Range) => void },
+  opts: {
+    interactive: boolean;
+    title: (c: number) => string;
+    /** Text shown inside the selection window. */
+    label: (r: [number, number]) => string;
+    onChange: (r: Range) => void;
+  },
 ): Timeline {
   const n = months.length;
   let values: number[] = new Array(n).fill(NaN);
@@ -28,13 +35,23 @@ export function createTimeline(
   root.innerHTML = `
     <div class="tl-scroll">
       <div class="tl-track" style="min-width:max(100%, ${n * MONTH_PX}px)">
-        <div class="tl-bars" ${opts.interactive ? 'tabindex="0"' : 'aria-disabled="true"'}>
-          ${months.map((_, c) => `<div class="tl-bar" data-c="${c}"><span></span></div>`).join('')}
+        <div class="tl-plot">
+          <div class="tl-axis" aria-hidden="true">${axisLabels(months)}</div>
+          <div class="tl-win" hidden></div>
+          <div class="tl-bars" ${opts.interactive ? 'tabindex="0"' : 'aria-disabled="true"'}>
+            ${months.map((_, c) => `<div class="tl-bar" data-c="${c}"><span></span></div>`).join('')}
+          </div>
+          <div class="tl-frame" hidden aria-hidden="true">
+            <span class="tl-handle" data-h="0"></span><span class="tl-handle" data-h="1"></span><span class="tl-win-label"></span>
+          </div>
         </div>
-        <div class="tl-axis" aria-hidden="true">${axisLabels(months)}</div>
       </div>
     </div>`;
   const scrollEl = root.querySelector<HTMLElement>('.tl-scroll')!;
+  const plotEl = root.querySelector<HTMLElement>('.tl-plot')!;
+  const winEl = root.querySelector<HTMLElement>('.tl-win')!;
+  const winLabel = root.querySelector<HTMLElement>('.tl-win-label')!;
+  const frameEl = root.querySelector<HTMLElement>('.tl-frame')!;
   const barsEl = root.querySelector<HTMLElement>('.tl-bars')!;
   const bars = Array.from(barsEl.children) as HTMLElement[];
 
@@ -48,23 +65,37 @@ export function createTimeline(
       fill.style.height = missing ? '' : `${Math.max(v > 0 ? 6 : 2, (v / max) * 100)}%`;
       const inRange = range === null || (c >= range[0] && c <= range[1]);
       b.classList.toggle('tl-on', inRange && isActive(c));
+      b.classList.toggle('tl-in', range !== null && range[1] > range[0] && inRange);
       b.title = opts.title(c);
     });
+    winEl.hidden = frameEl.hidden = range === null;
+    if (range === null) return;
+    for (const el of [winEl, frameEl]) {
+      el.style.left = `${(range[0] / n) * 100}%`;
+      el.style.width = `${((range[1] - range[0] + 1) / n) * 100}%`;
+    }
+    winLabel.textContent = opts.label(range);
   }
 
   /** Scroll the range into view (centred) unless it is already fully visible. */
   function reveal(r: Range) {
     if (r === null) return;
-    const w = barsEl.clientWidth / n;
-    const left = r[0] * w;
-    const right = (r[1] + 1) * w;
     const { scrollLeft, clientWidth } = scrollEl;
+    const offset = barsEl.getBoundingClientRect().left - scrollEl.getBoundingClientRect().left + scrollLeft;
+    const w = barsEl.clientWidth / n;
+    const left = offset + r[0] * w;
+    const right = offset + (r[1] + 1) * w;
     if (left >= scrollLeft && right <= scrollLeft + clientWidth) return;
     scrollEl.scrollTo({ left: (left + right) / 2 - clientWidth / 2, behavior: 'smooth' });
   }
 
   if (opts.interactive) {
+    // 'new': drag out a fresh range from `anchor`; 'resize': same, anchored at the edge opposite the handle;
+    // 'move': slide the whole range by the distance from `grab`.
+    let mode: 'new' | 'resize' | 'move' | null = null;
     let anchor = -1;
+    let grab = -1;
+    let start: [number, number] = [0, 0];
     let before: Range = null;
     let moved = false;
     let frame = 0;
@@ -77,33 +108,57 @@ export function createTimeline(
       return Math.min(n - 1, Math.max(0, Math.floor(((x - r.left) / r.width) * n)));
     };
     const set = (r: Range) => { range = r; paint(); emit(); };
+    const same = (a: Range, b: [number, number]) => a !== null && a[0] === b[0] && a[1] === b[1];
 
-    barsEl.addEventListener('pointerdown', (e) => {
+    plotEl.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      barsEl.setPointerCapture(e.pointerId);
-      anchor = at(e.clientX);
+      const c = at(e.clientX);
+      const handle = (e.target as HTMLElement).closest<HTMLElement>('.tl-handle');
       before = range;
       moved = false;
-      set([anchor, anchor]);
+      if (handle && range) {
+        mode = 'resize';
+        anchor = handle.dataset.h === '0' ? range[1] : range[0];
+        moved = true;
+      } else if (range && range[1] > range[0] && c >= range[0] && c <= range[1]) {
+        mode = 'move';
+        grab = c;
+        start = range;
+      } else {
+        mode = 'new';
+        anchor = c;
+        set([c, c]);
+      }
+      plotEl.setPointerCapture(e.pointerId);
+      e.preventDefault();
     });
-    barsEl.addEventListener('pointermove', (e) => {
-      if (anchor < 0) return;
+    plotEl.addEventListener('pointermove', (e) => {
+      if (mode === null) return;
       const c = at(e.clientX);
-      if (c !== anchor) moved = true;
-      if (range && range[0] === Math.min(anchor, c) && range[1] === Math.max(anchor, c)) return;
-      set([Math.min(anchor, c), Math.max(anchor, c)]);
+      let next: [number, number];
+      if (mode === 'move') {
+        if (c === grab && !moved) return;
+        moved = true;
+        const len = start[1] - start[0];
+        const s0 = Math.min(n - 1 - len, Math.max(0, start[0] + c - grab));
+        next = [s0, s0 + len];
+      } else {
+        if (c !== anchor) moved = true;
+        next = [Math.min(anchor, c), Math.max(anchor, c)];
+      }
+      if (!same(range, next)) set(next);
     });
-    const end = () => {
-      if (anchor < 0) return;
-      // clicking the single selected month again clears the selection
-      if (!moved && before && before[0] === anchor && before[1] === anchor) set(null);
-      anchor = -1;
-    };
-    barsEl.addEventListener('pointerup', end);
-    // touch swipes scroll the timeline (touch-action: pan-x), which cancels the pointer: undo the tap selection
-    barsEl.addEventListener('pointercancel', () => {
-      if (anchor < 0) return;
-      anchor = -1;
+    plotEl.addEventListener('pointerup', () => {
+      if (mode === null) return;
+      // a click inside a multi-month range picks that month; clicking the single selected month again clears it
+      if (mode === 'move' && !moved) set([grab, grab]);
+      else if (mode === 'new' && !moved && before && before[0] === anchor && before[1] === anchor) set(null);
+      mode = null;
+    });
+    // touch swipes on the bars scroll the timeline (touch-action: pan-x), which cancels the pointer
+    plotEl.addEventListener('pointercancel', () => {
+      if (mode === null) return;
+      mode = null;
       set(before);
     });
 

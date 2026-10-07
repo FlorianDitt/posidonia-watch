@@ -209,6 +209,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     outline-offset: 2px;
   }
   /* Timeline bars are rendered by src/lib/timeline.ts, hence :global() */
+  .timeline { --tl-win-bg: color-mix(in srgb, var(--sea) 12%, var(--surface)); }
   .timeline :global(.tl-scroll) {
     overflow-x: auto;
     padding-bottom: 0.25rem;
@@ -217,18 +218,22 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     scrollbar-color: var(--line) transparent;
   }
   .timeline :global(.tl-scroll:has(.tl-bars:focus-visible)) { outline: 2px solid var(--focus); outline-offset: 3px; }
+  /* padding keeps the window's top edge and the handles at both ends inside the scroll area */
+  .timeline :global(.tl-track) { padding: 0.375rem 0.5rem 0; }
+  .timeline :global(.tl-plot) { position: relative; touch-action: pan-x; }
   .timeline :global(.tl-bars) {
+    position: relative;
+    z-index: 2;
     display: flex;
     gap: 1px;
-    height: 2.75rem;
+    height: 3.5rem;
     cursor: crosshair;
-    touch-action: pan-x;
     user-select: none;
-    border-radius: 0.25rem;
   }
   .timeline :global(.tl-bars:focus-visible) { outline: none; }
   .timeline :global(.tl-bars[aria-disabled]) { cursor: default; }
   .timeline :global(.tl-bar) { display: flex; flex: 1 1 0; min-width: 0; align-items: flex-end; }
+  .timeline :global(.tl-bar.tl-in) { cursor: grab; }
   .timeline :global(.tl-bar span) {
     display: block;
     width: 100%;
@@ -241,8 +246,66 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     height: 2px;
     background: repeating-linear-gradient(90deg, var(--line) 0 2px, transparent 2px 4px);
   }
-  .timeline :global(.tl-axis) { position: relative; height: 1rem; margin-top: 0.25rem; font-size: 10px; color: var(--muted); }
-  .timeline :global(.tl-axis span) { position: absolute; top: 0; line-height: 1rem; white-space: nowrap; }
+  .timeline :global(.tl-axis) {
+    position: absolute;
+    inset: auto 0 0 0;
+    z-index: 0;
+    height: 1.25rem;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .timeline :global(.tl-axis span) { position: absolute; top: 0; line-height: 1.25rem; white-space: nowrap; }
+  /* Selection window: tinted backdrop under the bars, frame with handles above them. */
+  .timeline :global(.tl-win), .timeline :global(.tl-frame) {
+    position: absolute;
+    top: -0.375rem;
+    bottom: -0.125rem;
+    border-radius: 0.375rem;
+  }
+  .timeline :global(.tl-win) { z-index: 1; background: var(--tl-win-bg); }
+  .timeline :global(.tl-win-label) {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0 0.25rem;
+    border-radius: 0.25rem;
+    background: var(--tl-win-bg);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25rem;
+    color: var(--sea);
+    white-space: nowrap;
+  }
+  .timeline :global(.tl-frame) {
+    z-index: 3;
+    pointer-events: none;
+    border: 1px solid color-mix(in srgb, var(--sea) 30%, transparent);
+    border-inline: 2px solid var(--sea);
+  }
+  .timeline :global(.tl-handle) {
+    position: absolute;
+    top: 1.375rem;
+    width: 0.75rem;
+    height: 1.5rem;
+    border-radius: 0.3rem;
+    background: var(--sea);
+    pointer-events: auto;
+    touch-action: none;
+    cursor: ew-resize;
+  }
+  .timeline :global(.tl-handle::after) {
+    content: '';
+    position: absolute;
+    inset: 0.375rem auto 0.375rem 50%;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--surface);
+  }
+  .timeline :global(.tl-handle[data-h='0']) { left: -0.4375rem; }
+  .timeline :global(.tl-handle[data-h='1']) { right: -0.4375rem; }
+  .timeline :global(.tl-plot) { padding-bottom: 1.25rem; }
   /* Collapsible panel sections; several can be open at once. */
   .sec { border-bottom: 1px solid var(--line); }
   .sec summary {
