@@ -80,7 +80,7 @@ export function createTimeline(
   }
 
   /** Scroll the range into view (centred) unless it is already fully visible. */
-  function reveal(r: Range) {
+  function reveal(r: Range, behavior: ScrollBehavior = 'smooth') {
     if (r === null) return;
     const { scrollLeft, clientWidth } = scrollEl;
     const offset = barsEl.getBoundingClientRect().left - scrollEl.getBoundingClientRect().left + scrollLeft;
@@ -88,7 +88,7 @@ export function createTimeline(
     const left = offset + r[0] * w;
     const right = offset + (r[1] + 1) * w;
     if (left >= scrollLeft && right <= scrollLeft + clientWidth) return;
-    scrollEl.scrollTo({ left: (left + right) / 2 - clientWidth / 2, behavior: 'smooth' });
+    scrollEl.scrollTo({ left: (left + right) / 2 - clientWidth / 2, behavior });
   }
 
   if (opts.interactive) {
@@ -186,8 +186,15 @@ export function createTimeline(
   }
 
   paint();
-  // start at the most recent months
-  requestAnimationFrame(() => { scrollEl.scrollLeft = scrollEl.scrollWidth; });
+  // Start at the selected range, else the most recent months. The timeline usually starts hidden (closed
+  // section, collapsed panel) and has no width to scroll yet, so wait until it is first laid out.
+  const firstLayout = new ResizeObserver(() => {
+    if (scrollEl.clientWidth === 0) return;
+    firstLayout.disconnect();
+    if (range) reveal(range, 'instant');
+    else scrollEl.scrollLeft = scrollEl.scrollWidth;
+  });
+  firstLayout.observe(scrollEl);
   return {
     setValues(v) { values = v; paint(); },
     setRange(r) {
