@@ -107,6 +107,9 @@ export function createTimeline(
     // 'move': slide the whole range by the distance from `grab`.
     let mode: 'new' | 'resize' | 'move' | null = null;
     let anchor = -1;
+    /** Resize only: the month of the dragged edge, and where in the bars (px) the handle was grabbed. */
+    let edge = -1;
+    let grabPx = 0;
     let grab = -1;
     let start: [number, number] = [0, 0];
     let before: Range = null;
@@ -143,6 +146,10 @@ export function createTimeline(
       if (handle && range) {
         mode = 'resize';
         anchor = handle.dataset.h === '0' ? range[1] : range[0];
+        // The handle straddles the window edge, so the month under the pointer may be the neighbouring one;
+        // move the edge by the distance dragged instead, so grabbing it doesn't make it jump.
+        edge = handle.dataset.h === '0' ? range[0] : range[1];
+        grabPx = e.clientX - barsEl.getBoundingClientRect().left;
         moved = true;
       } else if (range && range[1] > range[0] && c >= range[0] && c <= range[1]) {
         mode = 'move';
@@ -163,7 +170,12 @@ export function createTimeline(
     /** Follow the pointer, but only over months that are on screen: hidden ones come in via edgeScroll. */
     function track(x: number) {
       const view = scrollEl.getBoundingClientRect();
-      const c = at(Math.min(view.right - 1, Math.max(view.left, x)));
+      const xv = Math.min(view.right - 1, Math.max(view.left, x));
+      let c = at(xv);
+      if (mode === 'resize') {
+        const bars = barsEl.getBoundingClientRect();
+        c = Math.min(n - 1, Math.max(0, edge + Math.round(((xv - bars.left - grabPx) / bars.width) * n)));
+      }
       let next: [number, number];
       if (mode === 'move') {
         if (c === grab && !moved) return;
