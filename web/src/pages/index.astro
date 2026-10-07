@@ -77,7 +77,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
                 <h3 class="sub">Months</h3>
                 <button type="button" id="time-reset" hidden class="text-xs text-sea underline">Show all</button>
               </div>
-              <div id="timeline" class="timeline" aria-label="Months: drag across the bars, or use the arrow keys (Shift to extend, Esc to reset)"></div>
+              <div id="timeline" class="timeline" aria-label="Months: drag across the bars, scroll sideways for earlier months, or use the arrow keys (Shift to extend, Esc to reset)"></div>
             </div>
             <div>
               <h3 class="sub">Season</h3>
@@ -209,16 +209,24 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     outline-offset: 2px;
   }
   /* Timeline bars are rendered by src/lib/timeline.ts, hence :global() */
+  .timeline :global(.tl-scroll) {
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    border-radius: 0.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+  .timeline :global(.tl-scroll:has(.tl-bars:focus-visible)) { outline: 2px solid var(--focus); outline-offset: 3px; }
   .timeline :global(.tl-bars) {
     display: flex;
     gap: 1px;
     height: 2.75rem;
     cursor: crosshair;
-    touch-action: none;
+    touch-action: pan-x;
     user-select: none;
     border-radius: 0.25rem;
   }
-  .timeline :global(.tl-bars:focus-visible) { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .timeline :global(.tl-bars:focus-visible) { outline: none; }
   .timeline :global(.tl-bars[aria-disabled]) { cursor: default; }
   .timeline :global(.tl-bar) { display: flex; flex: 1 1 0; min-width: 0; align-items: flex-end; }
   .timeline :global(.tl-bar span) {
