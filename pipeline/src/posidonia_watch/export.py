@@ -106,6 +106,10 @@ def hexes_monthly_obj(rows: pd.DataFrame, clear: np.ndarray, months: list[str]) 
         "month": [int(v) for v in rows["m"]],
         "on_posidonia": [int(v) for v in rows["n"]],
         "large_on_posidonia": [int(v) for v in rows["large"]],
+        "ais_on_posidonia": [int(v) for v in rows["ais"]],
+        "ais_large_on_posidonia": [int(v) for v in rows["ais_large"]],
+        "ais_stationary_on_posidonia": [int(v) for v in rows["ais_st"]],
+        "ais_stationary_large_on_posidonia": [int(v) for v in rows["ais_st_large"]],
         "clear_overpasses": [int(v) for v in clear.reshape(-1)],
     }
 
@@ -250,8 +254,11 @@ def validate_outputs(out_dir: Path) -> None:
     hm = json.loads((out_dir / "hexes_monthly.json").read_text())
     _check(hm["months"] == months, "hexes_monthly.months != meta.months")
     r = len(hm["cell"])
-    for k in ("month", "on_posidonia", "large_on_posidonia"):
+    for k in ("month", "on_posidonia", "large_on_posidonia", "ais_on_posidonia", "ais_large_on_posidonia",
+              "ais_stationary_on_posidonia", "ais_stationary_large_on_posidonia"):
         _check(len(hm[k]) == r, f"hexes_monthly.{k} length")
+    nested = zip(hm["ais_stationary_on_posidonia"], hm["ais_on_posidonia"], hm["on_posidonia"])
+    _check(all(s <= a <= o for s, a, o in nested), "hexes_monthly AIS counts must nest")
     _check(all(0 <= i < m for i in hm["cell"]), "hexes_monthly.cell index out of range")
     _check(all(0 <= k < n for k in hm["month"]), "hexes_monthly.month index out of range")
     _check(len(hm["clear_overpasses"]) == m * n, "hexes_monthly.clear_overpasses must be cells x months")

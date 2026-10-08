@@ -99,9 +99,10 @@ The detection's position and month are already public. None of the added
 fields identifies a vessel on its own: a flag is shared by thousands of
 boats, and the MMSI it comes from is not published.
 
-**Published as monthly totals** (`timeseries.json`): how many detections
-on Posidonia had a confident match, and how many of those AIS shows as
-stationary.
+**Published as counts**, per month (`timeseries.json`) and per hexagon and
+month (`hexes_monthly.json`): how many detections on Posidonia had a
+confident match, and how many of those AIS shows as stationary. The map uses
+the per-hexagon counts for its "AIS match" and "AIS: anchored" views.
 
 The MMSI is still read into the pipeline's local cache (needed to tell a
 match from no match), and is dropped before anything is written to
