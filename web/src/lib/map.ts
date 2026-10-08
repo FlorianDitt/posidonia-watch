@@ -20,8 +20,8 @@ type Metric = 'density' | 'on_posidonia' | 'large_on_posidonia';
 type SeasonSel = 'ALL' | Season;
 
 const MED_BBOX: [number, number, number, number] = [-6.0, 30.0, 36.5, 46.0];
-/** One colored basemap for both themes; dark mode only dims it (see addOverlays). */
-const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
+const STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const POSIDONIA_MINZOOM = 8;
 const POINTS_MINZOOM = 11;
 /** Below this zoom hexes are drawn as centroid dots. */
@@ -40,10 +40,11 @@ const METRIC_LABEL: Record<Metric, (largeLen: number) => string> = {
 
 /** Fetch the basemap style; if OpenFreeMap is unreachable, fall back to a plain background so our data still renders. */
 async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
+  const url = isDark() ? STYLE_DARK : STYLE_LIGHT;
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(STYLE_URL, { signal: ctrl.signal });
+    const res = await fetch(url, { signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()) as maplibregl.StyleSpecification;
@@ -423,10 +424,6 @@ export async function initMap() {
 
   function addOverlays() {
     const before = firstSymbolLayer();
-    // the colored basemap is glaring next to the dark UI; a faint veil under our layers tones it down
-    if (isDark() && !map.getLayer('basemap-dim')) {
-      map.addLayer({ id: 'basemap-dim', type: 'background', paint: { 'background-color': '#0f172a', 'background-opacity': 0.4 } }, before);
-    }
     if (!map.getSource('posidonia')) {
       map.addSource('posidonia', { type: 'geojson', data: posidoniaGeojson ?? { type: 'FeatureCollection', features: [] } });
     }
@@ -558,7 +555,7 @@ export async function initMap() {
   });
   map.on('moveend', () => { ensurePosidonia(); ensurePoints(); });
 
-  // reloading the style drops our layers; style.load re-adds them in the new theme's palette
+  // swapping the basemap drops our layers; style.load re-adds them in the new palette
   let dark = isDark();
   const onTheme = async () => {
     if (isDark() === dark) return;
