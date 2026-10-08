@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import shapely
 
+from .flags import flag_of
 from .habitat import MED_LAEA
 
 SEASONS = ("DJF", "MAM", "JJA", "SON")
@@ -64,7 +65,7 @@ def anchored_mask(df: pd.DataFrame, params: dict, filters: dict) -> np.ndarray:
 
 
 def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
-    """AIS view of each detection: matched, reported speed, and whether the match can check "anchored".
+    """AIS view of each detection: matched, flag, reported speed, and whether the match can check "anchored".
 
     ``ais_speed_kn`` is the mean of the speeds reported just before and after the image (NaN unless both
     exist). A detection is ``ais_checked`` when its match is confident and has that speed, and
@@ -78,6 +79,7 @@ def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     checked = matched & (conf >= params["ais_confidence_min"]) & ~np.isnan(speed)
     return pd.DataFrame({
         "ais_matched": matched,
+        "ais_flag": pd.Series(np.where(matched, flag_of(mmsi), None), index=df.index, dtype=object),
         "ais_speed_kn": np.where(matched, speed, np.nan),
         "ais_checked": checked,
         "ais_stationary": checked & (speed < params["speed_kn_max"]),
@@ -130,7 +132,8 @@ def classify(
     anch = det.loc[anchored_mask(det, params, filters)].copy()
     anch["on_posidonia"] = points_within(anch["lon"].to_numpy(), anch["lat"].to_numpy(), posidonia_buffered_metric)
     anch["large"] = anch["length_m_inferred"].to_numpy(dtype=float) >= params["large_length_m"]
-    anch[["ais_matched", "ais_speed_kn", "ais_checked", "ais_stationary"]] = ais_fields(anch, params)
+    ais = ais_fields(anch, params)
+    anch[ais.columns] = ais
     anch["h3"] = None
     on = anch["on_posidonia"].to_numpy()
     if on.any():

@@ -129,6 +129,7 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
         "ais_conf": ais("matching_confidence", 2),
         "ais_speed_kn": ais("ais_speed_kn", 1),
         "ais_length_m": ais("ais_length_m", 1),
+        "ais_flag": [f if m and isinstance(f, str) else None for f, m in zip(on["ais_flag"], matched)],
     }
 
 
@@ -259,7 +260,7 @@ def validate_outputs(out_dir: Path) -> None:
     pts = json.loads((out_dir / "points.json").read_text())
     p = len(pts["lon"])
     _check(p <= 200_000, "points cap")
-    for k in ("lon", "lat", "month", "length_m", "country", "ais_conf", "ais_speed_kn", "ais_length_m"):
+    for k in ("lon", "lat", "month", "length_m", "country", "ais_conf", "ais_speed_kn", "ais_length_m", "ais_flag"):
         _check(len(pts[k]) == p, f"points.{k} length")
     _check("mmsi" not in pts, "points must not contain the MMSI")
     _check(all(0 <= i < n for i in pts["month"]), "points.month index out of range")
