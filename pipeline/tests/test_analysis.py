@@ -71,3 +71,25 @@ def test_hotspots_rank_by_count_then_density_and_skip_empty_cells():
         "density": [0.1, np.nan, 0.5, 1.0],
     })
     assert analysis.hotspots(hexes, n=10)["h3"].tolist() == ["c", "a", "b"]
+
+
+def test_ais_fields_checks_only_confident_matches_with_both_speeds():
+    df = pd.DataFrame({
+        "mmsi":                ["1", "2", "3", None, "", "6"],
+        "matching_confidence": [0.95, 0.95, 0.5, 0.99, 0.99, 0.95],
+        "ais_speed_kn_before": [0.2, 6.0, 0.1, 0.1, 0.1, np.nan],
+        "ais_speed_kn_after":  [0.4, 7.0, 0.1, 0.1, 0.1, 0.3],
+    })
+    ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
+    assert ais["ais_matched"].tolist() == [True, True, True, False, False, True]
+    assert ais["ais_checked"].tolist() == [True, True, False, False, False, False]
+    assert ais["ais_stationary"].tolist() == [True, False, False, False, False, False]
+    assert ais["ais_speed_kn"].iloc[1] == 6.5
+    assert np.isnan(ais["ais_speed_kn"].iloc[3])  # no match: speed is not reported
+
+
+def test_ais_fields_treat_columns_missing_from_old_caches_as_unmatched():
+    df = pd.DataFrame({"mmsi": [np.nan], "matching_confidence": [np.nan],
+                       "ais_speed_kn_before": [np.nan], "ais_speed_kn_after": [np.nan]})
+    ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
+    assert not ais["ais_matched"].any() and not ais["ais_checked"].any()

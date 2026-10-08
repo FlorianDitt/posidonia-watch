@@ -54,6 +54,7 @@ def meta_obj(months: list[str], cfg, gfw_url: str) -> dict:
             "speed_kn_max": cfg.params["speed_kn_max"],
             "posidonia_buffer_m": cfg.params["posidonia_buffer_m"],
             "large_length_m": cfg.params["large_length_m"],
+            "ais_confidence_min": cfg.params["ais_confidence_min"],
         },
         "sources": [
             {"name": "GFW Sentinel-2 vessel detections", "license": "CC0-1.0", "url": gfw_url},
@@ -74,6 +75,8 @@ def timeseries_obj(totals: pd.DataFrame, by_country: dict, names: dict[str, str]
         "anchored_total": [int(v) for v in t["anchored_total"]],
         "anchored_on_posidonia": [int(v) for v in t["anchored_on_posidonia"]],
         "large_on_posidonia": [int(v) for v in t["large_on_posidonia"]],
+        "ais_matched_on_posidonia": [int(v) for v in t["ais_matched_on_posidonia"]],
+        "ais_stationary_on_posidonia": [int(v) for v in t["ais_stationary_on_posidonia"]],
         "by_country": {
             iso: {"name": names.get(iso, iso), **series}
             for iso, series in sorted(by_country.items(), key=lambda kv: -sum(kv[1]["anchored_on_posidonia"]))
@@ -111,12 +114,21 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
     on = anch[anch["on_posidonia"] & anch["month"].isin(months)]
     on = on.sort_values("detect_timestamp", ascending=False).head(cap)
     midx = {m: i for i, m in enumerate(months)}
+    # AIS values only for matched detections; the MMSI itself is never written (docs/ais.md)
+    matched = on["ais_matched"].to_numpy(dtype=bool)
+
+    def ais(col: str, nd: int) -> list:
+        return [_num(v, nd) if m else None for v, m in zip(on[col], matched)]
+
     return {
         "lon": [round(float(v), nd) for v in on["lon"]],
         "lat": [round(float(v), nd) for v in on["lat"]],
         "month": [midx[m] for m in on["month"]],
         "length_m": [_num(v, 1) for v in on["length_m_inferred"]],
         "country": on["country"].tolist(),
+        "ais_conf": ais("matching_confidence", 2),
+        "ais_speed_kn": ais("ais_speed_kn", 1),
+        "ais_length_m": ais("ais_length_m", 1),
     }
 
 
@@ -205,14 +217,16 @@ def validate_outputs(out_dir: Path) -> None:
     months = meta["months"]
     _check(months == sorted(months) and all(len(m) == 7 and m[4] == "-" for m in months),
            "meta.months must be sorted YYYY-MM")
-    _check(set(meta["params"]) >= {"speed_kn_max", "posidonia_buffer_m", "large_length_m"}, "meta.params keys")
+    _check(set(meta["params"]) >= {"speed_kn_max", "posidonia_buffer_m", "large_length_m", "ais_confidence_min"},
+           "meta.params keys")
     _check(len(meta["bbox"]) == 4, "meta.bbox")
     _check(all({"name", "license", "url"} <= set(s) for s in meta["sources"]), "meta.sources entries")
     n = len(months)
 
     ts = json.loads((out_dir / "timeseries.json").read_text())
     _check(ts["months"] == months, "timeseries.months != meta.months")
-    for k in ("anchored_total", "anchored_on_posidonia", "large_on_posidonia"):
+    for k in ("anchored_total", "anchored_on_posidonia", "large_on_posidonia", "ais_matched_on_posidonia",
+              "ais_stationary_on_posidonia"):
         _check(len(ts[k]) == n and all(isinstance(v, int) for v in ts[k]), f"timeseries.{k}")
     for iso, c in ts["by_country"].items():
         _check(len(iso) == 3 and "name" in c, f"by_country.{iso}")
@@ -245,8 +259,9 @@ def validate_outputs(out_dir: Path) -> None:
     pts = json.loads((out_dir / "points.json").read_text())
     p = len(pts["lon"])
     _check(p <= 200_000, "points cap")
-    for k in ("lon", "lat", "month", "length_m", "country"):
+    for k in ("lon", "lat", "month", "length_m", "country", "ais_conf", "ais_speed_kn", "ais_length_m"):
         _check(len(pts[k]) == p, f"points.{k} length")
+    _check("mmsi" not in pts, "points must not contain the MMSI")
     _check(all(0 <= i < n for i in pts["month"]), "points.month index out of range")
 
     fc = json.loads((out_dir / "posidonia.geojson").read_text())
