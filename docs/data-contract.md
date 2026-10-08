@@ -25,7 +25,9 @@ JSON is minified, UTF-8.
 - **AIS match**: GFW's match of a detection against AIS broadcasts, shipped
   in the same Zenodo files. **Confident** when `matching_confidence >=
   params.ais_confidence_min` (default 0.9). The AIS speed of a match is the
-  mean of `ais_speed_kn_before` and `ais_speed_kn_after`. The MMSI is never
+  mean of `ais_speed_kn_before` and `ais_speed_kn_after`. **AIS-stationary**:
+  a confident match whose AIS speed is known and below `params.speed_kn_max`,
+  i.e. the boat's own AIS confirms it was anchored. The MMSI is never
   published; see `docs/ais.md`.
 - **Density**: `on_posidonia / clear_overpasses` = average number of boats
   anchored on Posidonia in that cell at the moment of a clear image.
@@ -68,9 +70,9 @@ Mediterranean-wide totals per month, same order as `meta.months`.
 ```
 
 `ais_matched_on_posidonia` counts anchored-on-Posidonia detections with a
-confident AIS match and both AIS speeds; `ais_stationary_on_posidonia` is the
-part of those whose AIS speed is below `params.speed_kn_max`. Their ratio is
-how often the image-based "anchored" agrees with what the boat reported.
+confident AIS match; `ais_stationary_on_posidonia` the AIS-stationary part of
+those. Their ratio is how often the image-based "anchored" agrees with what
+the boat reported (matches without AIS speed count as not confirmed).
 
 `by_country` is keyed by ISO3 of the EEZ the detection falls in (Marine
 Regions). Key `"UNK"` for detections outside any EEZ or if EEZ lookup is
@@ -116,9 +118,18 @@ indexes `meta.months`.
   "month":              [3, 4, 4],
   "on_posidonia":       [2, 5, 1],
   "large_on_posidonia": [1, 2, 0],
+  "ais_on_posidonia":                  [1, 2, 0],
+  "ais_large_on_posidonia":            [1, 1, 0],
+  "ais_stationary_on_posidonia":       [1, 1, 0],
+  "ais_stationary_large_on_posidonia": [1, 0, 0],
   "clear_overpasses":   [4, 3, 0, "..."]
 }
 ```
+
+The `ais_*` arrays are row-aligned with `on_posidonia`: confident AIS matches
+and AIS-stationary detections in that cell and month (all and large). They let
+the web filter the map to AIS-matched boats. For every row
+`ais_stationary_on_posidonia <= ais_on_posidonia <= on_posidonia`.
 
 `cell`, `month`, `on_posidonia` and `large_on_posidonia` are sparse rows,
 only where `on_posidonia > 0`. `clear_overpasses` is dense, cell-major:
