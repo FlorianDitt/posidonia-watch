@@ -75,7 +75,7 @@ def test_hotspots_rank_by_count_then_density_and_skip_empty_cells():
 
 def test_ais_fields_checks_only_confident_matches_with_both_speeds():
     df = pd.DataFrame({
-        "mmsi":                ["1", "2", "3", None, "", "6"],
+        "mmsi":                ["227000001", "247000002", "3", None, "", "306000006"],
         "matching_confidence": [0.95, 0.95, 0.5, 0.99, 0.99, 0.95],
         "ais_speed_kn_before": [0.2, 6.0, 0.1, 0.1, 0.1, np.nan],
         "ais_speed_kn_after":  [0.4, 7.0, 0.1, 0.1, 0.1, 0.3],
@@ -85,6 +85,7 @@ def test_ais_fields_checks_only_confident_matches_with_both_speeds():
     assert ais["ais_checked"].tolist() == [True, True, False, False, False, False]
     assert ais["ais_stationary"].tolist() == [True, False, False, False, False, False]
     assert ais["ais_speed_kn"].iloc[1] == 6.5
+    assert ais["ais_flag"].tolist() == ["FR", "IT", None, None, None, None]  # short MMSI, no-flag MID 306
     assert np.isnan(ais["ais_speed_kn"].iloc[3])  # no match: speed is not reported
 
 
@@ -93,3 +94,9 @@ def test_ais_fields_treat_columns_missing_from_old_caches_as_unmatched():
                        "ais_speed_kn_before": [np.nan], "ais_speed_kn_after": [np.nan]})
     ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
     assert not ais["ais_matched"].any() and not ais["ais_checked"].any()
+
+
+def test_flag_of_reads_the_mid_of_nine_digit_ship_mmsis_only():
+    from posidonia_watch.flags import flag_of
+    got = flag_of(pd.Series(["247123456", " 227123456", "970123456", "24712345", None]))
+    assert got.tolist() == ["IT", "FR", None, None, None]  # 970: SART beacon, not a ship
