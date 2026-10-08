@@ -102,7 +102,9 @@ const sentinelYears = years.length > 1 ? `${years[0]}–${years[years.length - 1
       Larger boats broadcast their position, speed and identity over <abbr title="Automatic Identification System">AIS</abbr>.
       Global Fishing Watch matches each Sentinel-2 detection against these broadcasts, and the match ships with its open data.
       On the map, boats with a confident match (confidence ≥ {p.ais_confidence_min}) have a dark ring, and their popup shows
-      their flag state and the length and speed they reported. “Only boats with an AIS match” hides all others.
+      their flag state and the length and speed they reported. The <em>Boats</em> panel recounts the hexagons, the
+      monthly bars and the single boats for <em>AIS match</em> (confident matches only) or <em>AIS: anchored</em>
+      (matches whose own AIS speed is below {p.speed_kn_max} kn, the only boats whose anchoring is confirmed).
     </p>
     <p>
       AIS also checks the method: a boat counted as anchored should report almost no speed. For confidently matched boats
