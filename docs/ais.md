@@ -90,10 +90,14 @@ images), vessel names, IMO numbers, exact AIS timestamps or AIS positions.
 **Published per detection** (`points.json`):
 
 - whether there is a match, and its confidence (rounded to 2 decimals);
-- the AIS-reported speed (mean of before/after) and length.
+- the AIS-reported speed (mean of before/after) and length;
+- the flag state: the country of registration, from the first three digits
+  of the MMSI (its Maritime Identification Digits, assigned by the ITU).
+  The table is in `pipeline/src/posidonia_watch/flags.py`.
 
 The detection's position and month are already public. None of the added
-fields identifies a vessel on its own.
+fields identifies a vessel on its own: a flag is shared by thousands of
+boats, and the MMSI it comes from is not published.
 
 **Published as monthly totals** (`timeseries.json`): how many detections
 on Posidonia had a confident match, and how many of those AIS shows as
@@ -103,10 +107,8 @@ The MMSI is still read into the pipeline's local cache (needed to tell a
 match from no match), and is dropped before anything is written to
 `web/public/data/`.
 
-**Flag state** (derived from the first three digits of the MMSI, the
-country of registration) is not personal and could be added later as an
-aggregate. Vessel *type* is not in the Zenodo files; it would need the GFW
-API, whose licence rules it out (see below).
+Vessel *type* is not in the Zenodo files. It would need the GFW API, whose
+licence rules it out (see below).
 
 ## Why Sentinel-1 is not used
 

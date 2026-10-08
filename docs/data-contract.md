@@ -139,7 +139,8 @@ Columnar, capped at 200 000 rows (most recent first if capped).
   "country": ["FRA"],
   "ais_conf": [0.97],
   "ais_speed_kn": [0.2],
-  "ais_length_m": [33.0]
+  "ais_length_m": [33.0],
+  "ais_flag": ["FR"]
 }
 ```
 
@@ -147,7 +148,9 @@ Columnar, capped at 200 000 rows (most recent first if capped).
 `ais_conf` is the AIS match confidence (2 decimals), `null` without a match.
 `ais_speed_kn` (1 decimal) and `ais_length_m` (1 decimal) come from the
 matched vessel's AIS messages, `null` without a match or when AIS lacks them.
-They are published for every match; consumers apply
+`ais_flag` is the ISO 3166-1 alpha-2 flag state from the matched MMSI's first
+three digits (its MID), `null` without a match or for an unknown MID. All AIS
+fields are published for every match; consumers apply
 `params.ais_confidence_min` themselves.
 
 ## `posidonia.geojson`
