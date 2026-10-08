@@ -22,6 +22,11 @@ JSON is minified, UTF-8.
 - **Clear overpasses**: per H3 cell and month, `overpasses_cloud_under_20`
   from GFW's `sentinel2_overpass_YYYYMM.csv`. Used to normalise for how often
   a place was actually observed.
+- **AIS match**: GFW's match of a detection against AIS broadcasts, shipped
+  in the same Zenodo files. **Confident** when `matching_confidence >=
+  params.ais_confidence_min` (default 0.9). The AIS speed of a match is the
+  mean of `ais_speed_kn_before` and `ais_speed_kn_after`. The MMSI is never
+  published; see `docs/ais.md`.
 - **Density**: `on_posidonia / clear_overpasses` = average number of boats
   anchored on Posidonia in that cell at the moment of a clear image.
   `null` when `clear_overpasses == 0`.
@@ -34,7 +39,7 @@ JSON is minified, UTF-8.
   "methodology_version": "1",
   "months": ["2019-01", "..."],
   "h3_resolution": 7,
-  "params": { "speed_kn_max": 1.0, "posidonia_buffer_m": 20, "large_length_m": 24 },
+  "params": { "speed_kn_max": 1.0, "posidonia_buffer_m": 20, "large_length_m": 24, "ais_confidence_min": 0.9 },
   "sources": [
     { "name": "GFW Sentinel-2 vessel detections", "license": "CC0-1.0", "url": "https://doi.org/10.5281/zenodo.15978308" },
     { "name": "EMODnet Seabed Habitats – Seagrass cover (EOV), version 2025", "license": "CC-BY-4.0", "url": "https://emodnet.ec.europa.eu/geonetwork/srv/eng/catalog.search#/metadata/39746d9c-4220-425c-bc26-7cb3056c36a5" },
@@ -54,11 +59,18 @@ Mediterranean-wide totals per month, same order as `meta.months`.
   "anchored_total":      [0, 0],
   "anchored_on_posidonia": [0, 0],
   "large_on_posidonia":  [0, 0],
+  "ais_matched_on_posidonia":    [0, 0],
+  "ais_stationary_on_posidonia": [0, 0],
   "by_country": {
     "FRA": { "name": "France", "anchored_on_posidonia": [0, 0], "large_on_posidonia": [0, 0] }
   }
 }
 ```
+
+`ais_matched_on_posidonia` counts anchored-on-Posidonia detections with a
+confident AIS match and both AIS speeds; `ais_stationary_on_posidonia` is the
+part of those whose AIS speed is below `params.speed_kn_max`. Their ratio is
+how often the image-based "anchored" agrees with what the boat reported.
 
 `by_country` is keyed by ISO3 of the EEZ the detection falls in (Marine
 Regions). Key `"UNK"` for detections outside any EEZ or if EEZ lookup is
@@ -124,11 +136,19 @@ Columnar, capped at 200 000 rows (most recent first if capped).
   "lat":   [42.12345],
   "month": [87],
   "length_m": [31.5],
-  "country": ["FRA"]
+  "country": ["FRA"],
+  "ais_conf": [0.97],
+  "ais_speed_kn": [0.2],
+  "ais_length_m": [33.0]
 }
 ```
 
 `month` is an index into `meta.months`. Coordinates rounded to 5 decimals.
+`ais_conf` is the AIS match confidence (2 decimals), `null` without a match.
+`ais_speed_kn` (1 decimal) and `ais_length_m` (1 decimal) come from the
+matched vessel's AIS messages, `null` without a match or when AIS lacks them.
+They are published for every match; consumers apply
+`params.ais_confidence_min` themselves.
 
 ## `posidonia.geojson`
 
