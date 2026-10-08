@@ -18,6 +18,8 @@ maplibregl.setWorkerUrl(workerUrl);
 
 type Metric = 'density' | 'on_posidonia' | 'large_on_posidonia';
 type SeasonSel = 'ALL' | Season;
+/** Which boats are counted: all, confident AIS matches, or matches whose AIS confirms they were anchored. */
+type Boats = 'all' | 'ais' | 'ais_st';
 
 const MED_BBOX: [number, number, number, number] = [-6.0, 30.0, 36.5, 46.0];
 const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/positron';
@@ -73,13 +75,12 @@ interface State {
   showSmall: boolean;
   /** Single boats at or above the large-boat length (pink). */
   showLarge: boolean;
-  /** Only single boats with a confident AIS match. */
-  aisOnly: boolean;
+  boats: Boats;
   /** Selected calendar months (indices into `calendar`), null = all. */
   range: Range;
 }
 
-const state: State = { metric: 'on_posidonia', season: 'ALL', showHexes: true, showPosidonia: true, showSmall: true, showLarge: true, aisOnly: false, range: null };
+const state: State = { metric: 'on_posidonia', season: 'ALL', showHexes: true, showPosidonia: true, showSmall: true, showLarge: true, boats: 'all', range: null };
 
 let meta: Meta | null = null;
 let hexes: Hexes | null = null;
@@ -96,6 +97,7 @@ let posidoniaLoading = false;
 let largeLen = 24;
 /** GFW matching_confidence from which an AIS match counts (meta.params.ais_confidence_min). */
 let aisMin = 0.9;
+let speedMax = 1;
 
 function setStatus(msg: string | null) {
   const el = $('map-status');
@@ -135,7 +137,10 @@ function buildPointsGeojson(p: Points): GeoJSON.FeatureCollection {
 function aisProps(p: Points, i: number) {
   const conf = p.ais_conf?.[i];
   if (conf == null) return { a: 0 };
-  return { a: conf >= aisMin ? 1 : 0, ac: conf, as: p.ais_speed_kn?.[i] ?? null, al: p.ais_length_m?.[i] ?? null, af: p.ais_flag?.[i] ?? null };
+  const speed = p.ais_speed_kn?.[i] ?? null;
+  const a = conf >= aisMin ? 1 : 0;
+  // st: the boat's own AIS confirms it was anchored (same rule as the pipeline's AIS-stationary)
+  return { a, st: a && speed !== null && speed < speedMax ? 1 : 0, ac: conf, as: speed, al: p.ais_length_m?.[i] ?? null, af: p.ais_flag?.[i] ?? null };
 }
 
 /** Quantile class breaks over positive, finite values. Returns ascending unique thresholds (<= 4). */
@@ -186,27 +191,30 @@ function selectedMonthIdx(): number[] | null {
 function aggregate(): Agg {
   const h = hexes!;
   const sel = selectedMonthIdx();
-  const key = sel === null ? 'all' : monthly ? sel.join(',') : `season:${state.season}`;
+  const ais = state.boats !== 'all' && aisMonthly() !== null;
+  const key = `${ais ? state.boats : 'all'}|${sel === null ? 'all' : monthly ? sel.join(',') : `season:${state.season}`}`;
   if (aggCache?.key === key) return aggCache.agg;
   const num = (a: (number | null)[] | undefined) => (a ?? []).map((x) => (x == null ? NaN : x));
   const ratio = (on: number[], clear: number[] | undefined) => on.map((x, i) => (clear && clear[i] > 0 ? x / clear[i] : NaN));
   let agg: Agg;
-  if (sel === null) {
+  if (sel === null && !ais) {
     agg = { on_posidonia: num(h.on_posidonia), large_on_posidonia: num(h.large_on_posidonia), density: num(h.density) };
   } else if (monthly) {
     const n = h.h3.length;
     const M = monthly.months.length;
+    const months = sel ?? [...Array(M).keys()];
     const want = new Uint8Array(M);
-    for (const k of sel) want[k] = 1;
+    for (const k of months) want[k] = 1;
+    const [onRows, largeRows] = rowCounts(monthly);
     const on = new Array<number>(n).fill(0);
     const large = new Array<number>(n).fill(0);
     const clear = new Array<number>(n).fill(0);
     for (let r = 0; r < monthly.cell.length; r++) {
       if (!want[monthly.month[r]]) continue;
-      on[monthly.cell[r]] += monthly.on_posidonia[r];
-      large[monthly.cell[r]] += monthly.large_on_posidonia[r];
+      on[monthly.cell[r]] += onRows[r];
+      large[monthly.cell[r]] += largeRows[r];
     }
-    for (let i = 0; i < n; i++) for (const k of sel) clear[i] += monthly.clear_overpasses[i * M + k];
+    for (let i = 0; i < n; i++) for (const k of months) clear[i] += monthly.clear_overpasses[i * M + k];
     agg = { on_posidonia: on, large_on_posidonia: large, density: ratio(on, clear) };
   } else {
     // Older build without hexes_monthly.json: no range selection, seasons come from hexes.json.
@@ -221,6 +229,38 @@ function aggregate(): Agg {
   aggCache = { key, agg };
   return agg;
 }
+
+/** hexes_monthly when it carries the AIS counts (data built before AIS matching does not). */
+function aisMonthly(): HexesMonthly | null {
+  return monthly?.ais_on_posidonia && monthly.ais_stationary_on_posidonia ? monthly : null;
+}
+
+/** The per-row [all, large] counts of hexes_monthly for the chosen boats. */
+function rowCounts(m: HexesMonthly): [number[], number[]] {
+  if (state.boats === 'ais' && m.ais_on_posidonia && m.ais_large_on_posidonia) return [m.ais_on_posidonia, m.ais_large_on_posidonia];
+  if (state.boats === 'ais_st' && m.ais_stationary_on_posidonia && m.ais_stationary_large_on_posidonia) {
+    return [m.ais_stationary_on_posidonia, m.ais_stationary_large_on_posidonia];
+  }
+  return [m.on_posidonia, m.large_on_posidonia];
+}
+
+/** Month totals (index = meta.months) for the chosen boats, summed from hexes_monthly. */
+let monthTotalsCache: { key: string; on: number[]; large: number[] } | null = null;
+function aisMonthTotals(): { on: number[]; large: number[] } | null {
+  const m = aisMonthly();
+  if (!m || state.boats === 'all') return null;
+  if (monthTotalsCache?.key === state.boats) return monthTotalsCache;
+  const on = new Array<number>(m.months.length).fill(0);
+  const large = new Array<number>(m.months.length).fill(0);
+  const [onRows, largeRows] = rowCounts(m);
+  for (let r = 0; r < m.cell.length; r++) { on[m.month[r]] += onRows[r]; large[m.month[r]] += largeRows[r]; }
+  monthTotalsCache = { key: state.boats, on, large };
+  return monthTotalsCache;
+}
+
+const BOATS_LABEL: Record<Boats, string> = { all: 'All', ais: 'AIS match', ais_st: 'AIS: anchored' };
+/** What the counted boats are, for legend and popups. */
+const boatsWord = () => (state.boats === 'ais' ? 'AIS-matched boats' : state.boats === 'ais_st' ? 'boats AIS confirms anchored' : 'boats');
 
 function activeIsCount(): boolean {
   return state.metric !== 'density';
@@ -301,7 +341,7 @@ function renderLegend() {
   const el = $('legend');
   const title = $('legend-title');
   const isCount = activeIsCount();
-  title.textContent = METRIC_LABEL[state.metric](largeLen);
+  title.textContent = METRIC_LABEL[state.metric](largeLen) + (state.boats === 'all' ? '' : ` · ${BOATS_LABEL[state.boats]}`);
   const vals = activeValues().filter((x) => Number.isFinite(x) && x > 0);
   if (!hexes || vals.length === 0) {
     el.innerHTML = '<p class="text-muted">No values to show.</p>';
@@ -343,7 +383,7 @@ function hexPopupHtml(i: number): string {
     <div class="font-medium text-ink-2">${escapeHtml(countryName(h.country?.[i]))}</div>
     <div class="text-muted">${escapeHtml(periodLabel())}</div>
     <div class="mt-2 text-2xl font-semibold leading-none tabular">${fmtInt(a.on_posidonia[i])}</div>
-    <div class="mb-3 mt-1 text-ink-2">boats anchored on seagrass</div>
+    <div class="mb-3 mt-1 text-ink-2">${boatsWord()} on seagrass</div>
     <table class="w-full">
       ${row(`≥ ${largeLen} m`, fmtInt(a.large_on_posidonia[i]))}
       ${row('Per clear image', Number.isFinite(d) ? fmtNum(d, 2) : 'n/a')}
@@ -386,6 +426,7 @@ export async function initMap() {
   if (ts?.by_country) setCountryNames(Object.fromEntries(Object.entries(ts.by_country).map(([k, v]) => [k, v.name])));
   largeLen = meta?.params?.large_length_m ?? 24;
   aisMin = meta?.params?.ais_confidence_min ?? 0.9;
+  speedMax = meta?.params?.speed_kn_max ?? 1;
   calendar = buildCalendar(meta?.months ?? []);
   if (hx && Array.isArray(hx.h3) && hx.h3.length > 0) {
     hexes = hx;
@@ -433,7 +474,8 @@ export async function initMap() {
   state.showPosidonia = checked('toggle-posidonia');
   state.showSmall = checked('toggle-small');
   state.showLarge = checked('toggle-large');
-  state.aisOnly = document.querySelector<HTMLInputElement>('#toggle-ais')?.checked ?? false;
+  const boats = document.querySelector<HTMLInputElement>('input[name="boats"]:checked')?.value;
+  if (boats) state.boats = boats as Boats;
   const metric = document.querySelector<HTMLInputElement>('input[name="metric"]:checked')?.value;
   if (metric) state.metric = metric as Metric;
 
@@ -526,7 +568,8 @@ export async function initMap() {
     if (sel !== null) conds.push(['in', ['get', 'm'], ['literal', sel]]);
     if (!state.showSmall) conds.push(['>=', ['get', 'L'], largeLen]);
     if (!state.showLarge) conds.push(['<', ['get', 'L'], largeLen]);
-    if (state.aisOnly) conds.push(['==', ['get', 'a'], 1]);
+    if (state.boats === 'ais') conds.push(['==', ['get', 'a'], 1]);
+    if (state.boats === 'ais_st') conds.push(['==', ['get', 'st'], 1]);
     map.setFilter('points', conds.length ? (['all', ...conds] as ExpressionSpecification) : null);
   }
 
@@ -661,13 +704,15 @@ export async function initMap() {
 
   const seasonButtons = document.querySelectorAll<HTMLButtonElement>('#season-group button');
   const timelineValues = () => {
-    const series = state.metric === 'large_on_posidonia' ? ts?.large_on_posidonia : ts?.anchored_on_posidonia;
+    const large = state.metric === 'large_on_posidonia';
+    const aisTotals = aisMonthTotals();
+    const series = aisTotals ? (large ? aisTotals.large : aisTotals.on) : large ? ts?.large_on_posidonia : ts?.anchored_on_posidonia;
     return calendar.map((e) => (e.idx < 0 ? NaN : series?.[e.idx] ?? NaN));
   };
   const timeline = createTimeline($('timeline'), calendar.map((e) => e.month), {
     interactive: monthly !== null,
     title: (c, v) => {
-      const what = state.metric === 'large_on_posidonia' ? `boats ≥ ${largeLen} m` : 'boats';
+      const what = state.metric === 'large_on_posidonia' ? `${boatsWord()} ≥ ${largeLen} m` : boatsWord();
       return `${fmtMonth(calendar[c].month)}: ${Number.isFinite(v) ? `${fmtInt(v)} ${what} on seagrass` : 'no data'}`;
     },
     label: ([a, b]) => {
@@ -723,6 +768,7 @@ export async function initMap() {
     $('sum-time').textContent = state.season === 'ALL' ? when
       : year === 'ALL' ? `${SEASON_LABEL[state.season].split(' ')[0]} only` : `${when}, ${seasonWord(state.season)} only`;
     $('time-reset').hidden = state.range === null;
+    $('sum-boats').textContent = BOATS_LABEL[state.boats];
   }
 
   /** Re-render everything that depends on metric, range or season. */
@@ -741,6 +787,17 @@ export async function initMap() {
 
   document.querySelectorAll<HTMLInputElement>('input[name="metric"]').forEach((r) =>
     r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; update(); } }));
+  // Data without AIS counts (older builds) cannot recount the map, so only "All" is offered
+  const boatInputs = document.querySelectorAll<HTMLInputElement>('input[name="boats"]');
+  if (!aisMonthly()) {
+    state.boats = 'all';
+    boatInputs.forEach((r) => {
+      r.checked = r.value === 'all';
+      if (r.value !== 'all') { r.disabled = true; r.parentElement!.title = 'No AIS data in this release'; }
+    });
+  }
+  boatInputs.forEach((r) =>
+    r.addEventListener('change', () => { if (r.checked) { state.boats = r.value as Boats; update(); } }));
   seasonButtons.forEach((b) => b.addEventListener('click', () => {
     const s = b.dataset.season as Season;
     state.season = s === state.season ? 'ALL' : s;
@@ -778,10 +835,6 @@ export async function initMap() {
       ensurePoints();
     });
   }
-  $<HTMLInputElement>('toggle-ais').addEventListener('change', (e) => {
-    state.aisOnly = (e.target as HTMLInputElement).checked;
-    applyPointFilter();
-  });
   const list = $('hotspot-list');
   if (!hs || !Array.isArray(hs) || hs.length === 0) {
     list.innerHTML = '<li class="px-2 py-4 text-center text-xs text-muted">No hotspots published yet.</li>';
