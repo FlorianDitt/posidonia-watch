@@ -157,6 +157,8 @@ body {
 .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--surface) !important; }
 .maplibregl-popup-close-button { color: var(--muted); font-size: 18px; padding: 0 6px; }
 .maplibregl-ctrl-attrib { font-size: 11px; }
+/* the colored basemap shows through MapLibre's half-transparent default, so give the attribution a solid backing */
+.maplibregl-ctrl-attrib { background: rgba(255, 255, 255, 0.9) !important; color: var(--ink-2); }
 .pw-hover { pointer-events: none; }
 @media (max-width: 639.98px) {
   /* keep attribution/scale above the collapsed bottom sheet */
@@ -165,6 +167,7 @@ body {
 .maplibregl-ctrl-group, .maplibregl-ctrl-attrib, .maplibregl-ctrl-scale {
   @variant dark { background: rgba(20, 34, 37, 0.9) !important; color: var(--ink-2); border-color: var(--ink-2); }
 }
-.maplibregl-ctrl-attrib a { @variant dark { color: var(--ink-2); } }
-.maplibregl-ctrl-group button .maplibregl-ctrl-icon { @variant dark { filter: invert(1); } }
+/* maplibre-gl.css loads after this file and colors the links near-black, so the dark text needs !important */
+.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib a { @variant dark { color: #fff !important; } }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon, .maplibregl-ctrl-attrib-button { @variant dark { filter: invert(1); } }
 .maplibregl-ctrl-group button + button { @variant dark { border-top-color: var(--line); } }

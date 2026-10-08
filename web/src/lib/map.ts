@@ -20,7 +20,7 @@ type Metric = 'density' | 'on_posidonia' | 'large_on_posidonia';
 type SeasonSel = 'ALL' | Season;
 
 const MED_BBOX: [number, number, number, number] = [-6.0, 30.0, 36.5, 46.0];
-const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/positron';
+const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
 const STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const POSIDONIA_MINZOOM = 8;
 const POINTS_MINZOOM = 11;
