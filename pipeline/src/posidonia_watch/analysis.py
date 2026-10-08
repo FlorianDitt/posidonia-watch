@@ -65,24 +65,24 @@ def anchored_mask(df: pd.DataFrame, params: dict, filters: dict) -> np.ndarray:
 
 
 def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
-    """AIS view of each detection: matched, flag, reported speed, and whether the match can check "anchored".
+    """AIS view of each detection: matched, flag, reported speed, confident, and AIS-confirmed stationary.
 
     ``ais_speed_kn`` is the mean of the speeds reported just before and after the image (NaN unless both
-    exist). A detection is ``ais_checked`` when its match is confident and has that speed, and
-    ``ais_stationary`` when the checked speed is below ``speed_kn_max``.
+    exist). ``ais_confident`` is a match with ``matching_confidence >= ais_confidence_min``, and
+    ``ais_stationary`` a confident match whose speed is known and below ``speed_kn_max``.
     """
     mmsi = df["mmsi"]
     matched = (mmsi.notna() & (mmsi.astype(str).str.strip() != "")).to_numpy()
     conf = pd.to_numeric(df["matching_confidence"], errors="coerce").to_numpy(dtype=float)
     speed = ((pd.to_numeric(df["ais_speed_kn_before"], errors="coerce")
               + pd.to_numeric(df["ais_speed_kn_after"], errors="coerce")) / 2).to_numpy(dtype=float)
-    checked = matched & (conf >= params["ais_confidence_min"]) & ~np.isnan(speed)
+    confident = matched & (conf >= params["ais_confidence_min"])
     return pd.DataFrame({
         "ais_matched": matched,
         "ais_flag": pd.Series(np.where(matched, flag_of(mmsi), None), index=df.index, dtype=object),
         "ais_speed_kn": np.where(matched, speed, np.nan),
-        "ais_checked": checked,
-        "ais_stationary": checked & (speed < params["speed_kn_max"]),
+        "ais_confident": confident,
+        "ais_stationary": confident & (speed < params["speed_kn_max"]),  # NaN speed compares False
     }, index=df.index)
 
 
@@ -151,7 +151,7 @@ def monthly_totals(anch: pd.DataFrame, months: list[str]) -> pd.DataFrame:
         g.apply(lambda x: int((x["on_posidonia"] & x["large"]).sum()), include_groups=False) if len(anch) else 0
     )
     on = anch[anch["on_posidonia"]].groupby("month")
-    out["ais_matched_on_posidonia"] = on["ais_checked"].sum()
+    out["ais_matched_on_posidonia"] = on["ais_confident"].sum()
     out["ais_stationary_on_posidonia"] = on["ais_stationary"].sum()
     return out.fillna(0).astype(int)
 
@@ -231,19 +231,24 @@ def hex_monthly(
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """Per (cell, month) values, so the web can aggregate any month selection.
 
-    Returns sparse on-Posidonia counts (columns i, m, n, large; ``i`` indexes
-    ``hex_ids``, ``m`` indexes ``months``, only non-zero rows) and a dense
+    Returns sparse on-Posidonia counts (columns i, m, n, large, plus the AIS counts ais, ais_large, ais_st,
+    ais_st_large; ``i`` indexes ``hex_ids``, ``m`` indexes ``months``, only rows with n > 0) and a dense
     ``len(hex_ids) x len(months)`` matrix of clear overpasses.
     """
     pos = pd.Series(np.arange(len(hex_ids)), index=pd.Index(hex_ids))
     midx = pd.Series(np.arange(len(months)), index=pd.Index(months))
     on = anch[anch["on_posidonia"] & anch["month"].isin(months) & anch["h3"].isin(pos.index)]
-    rows = on.groupby(["h3", "month"]).agg(n=("large", "size"), large=("large", "sum")).reset_index()
+    on = on.assign(
+        ais=on["ais_confident"], ais_large=on["ais_confident"] & on["large"],
+        ais_st=on["ais_stationary"], ais_st_large=on["ais_stationary"] & on["large"],
+    )
+    counts = ["large", "ais", "ais_large", "ais_st", "ais_st_large"]
+    rows = on.groupby(["h3", "month"]).agg(n=("large", "size"), **{c: (c, "sum") for c in counts}).reset_index()
     rows = pd.DataFrame({
         "i": pos.reindex(rows["h3"]).to_numpy(),
         "m": midx.reindex(rows["month"]).to_numpy(),
         "n": rows["n"].astype(int).to_numpy(),
-        "large": rows["large"].astype(int).to_numpy(),
+        **{c: rows[c].astype(int).to_numpy() for c in counts},
     }).sort_values(["i", "m"]).reset_index(drop=True)
 
     clear = np.zeros((len(hex_ids), len(months)), dtype=np.int64)

@@ -73,7 +73,7 @@ def test_hotspots_rank_by_count_then_density_and_skip_empty_cells():
     assert analysis.hotspots(hexes, n=10)["h3"].tolist() == ["c", "a", "b"]
 
 
-def test_ais_fields_checks_only_confident_matches_with_both_speeds():
+def test_ais_fields_confirm_stationary_only_for_confident_matches_with_both_speeds():
     df = pd.DataFrame({
         "mmsi":                ["227000001", "247000002", "3", None, "", "306000006"],
         "matching_confidence": [0.95, 0.95, 0.5, 0.99, 0.99, 0.95],
@@ -82,8 +82,8 @@ def test_ais_fields_checks_only_confident_matches_with_both_speeds():
     })
     ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
     assert ais["ais_matched"].tolist() == [True, True, True, False, False, True]
-    assert ais["ais_checked"].tolist() == [True, True, False, False, False, False]
-    assert ais["ais_stationary"].tolist() == [True, False, False, False, False, False]
+    assert ais["ais_confident"].tolist() == [True, True, False, False, False, True]
+    assert ais["ais_stationary"].tolist() == [True, False, False, False, False, False]  # last: speed unknown
     assert ais["ais_speed_kn"].iloc[1] == 6.5
     assert ais["ais_flag"].tolist() == ["FR", "IT", None, None, None, None]  # short MMSI, no-flag MID 306
     assert np.isnan(ais["ais_speed_kn"].iloc[3])  # no match: speed is not reported
@@ -93,10 +93,23 @@ def test_ais_fields_treat_columns_missing_from_old_caches_as_unmatched():
     df = pd.DataFrame({"mmsi": [np.nan], "matching_confidence": [np.nan],
                        "ais_speed_kn_before": [np.nan], "ais_speed_kn_after": [np.nan]})
     ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
-    assert not ais["ais_matched"].any() and not ais["ais_checked"].any()
+    assert not ais["ais_matched"].any() and not ais["ais_confident"].any()
 
 
 def test_flag_of_reads_the_mid_of_nine_digit_ship_mmsis_only():
     from posidonia_watch.flags import flag_of
     got = flag_of(pd.Series(["247123456", " 227123456", "970123456", "24712345", None]))
     assert got.tolist() == ["IT", "FR", None, None, None]  # 970: SART beacon, not a ship
+
+
+def test_hex_monthly_counts_ais_matches_per_cell_and_month():
+    anch = pd.DataFrame({
+        "on_posidonia": [True, True, True, False], "month": ["2025-07"] * 4, "h3": ["a", "a", "a", None],
+        "large": [True, False, True, True], "ais_confident": [True, True, False, True],
+        "ais_stationary": [True, False, False, True],
+    })
+    ovp = pd.DataFrame({"h3_id": ["a"], "month": ["2025-07"], "overpasses_cloud_under_20": [3]})
+    rows, clear = analysis.hex_monthly(anch, ["a"], ovp, ["2025-07"])
+    r = rows.iloc[0]
+    assert (r.n, r.large, r.ais, r.ais_large, r.ais_st, r.ais_st_large) == (3, 2, 2, 1, 1, 1)
+    assert clear.tolist() == [[3]]
