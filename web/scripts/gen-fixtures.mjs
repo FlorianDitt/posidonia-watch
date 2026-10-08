@@ -17,6 +17,14 @@ const rand = () => {
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
+// Separate stream for the AIS fields, so adding them left every other fixture value unchanged
+let aisSeed = 8675309;
+const aisRand = () => {
+  aisSeed |= 0; aisSeed = (aisSeed + 0x6d2b79f5) | 0;
+  let t = Math.imul(aisSeed ^ (aisSeed >>> 15), 1 | aisSeed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
 const randn = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
 const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
 
@@ -66,7 +74,13 @@ for (const r of regions) {
 // A few isolated cells outside any EEZ / with no clear overpasses
 const rows = [...hexMap.values()];
 
-const points = { lon: [], lat: [], month: [], length_m: [], country: [] };
+const points = {
+  lon: [], lat: [], month: [], length_m: [], country: [], ais_conf: [], ais_speed_kn: [], ais_length_m: [], ais_flag: [],
+};
+// Flag states: mostly the local country, some foreign and open-registry flags
+const LOCAL_FLAG = { ESP: 'ES', FRA: 'FR', ITA: 'IT', HRV: 'HR', GRC: 'GR', TUR: 'TR', MLT: 'MT', CYP: 'CY', MCO: 'MC' };
+const OTHER_FLAGS = ['GB', 'MT', 'KY', 'MH', 'DE', 'NL', 'CH', 'US'];
+const AIS_CONF_MIN = 0.9;
 const hexes = {
   h3: [], country: [], on_posidonia: [], large_on_posidonia: [], clear_overpasses: [],
   density: [], posidonia_km2: [], by_season: { DJF: [], MAM: [], JJA: [], SON: [] },
@@ -76,6 +90,8 @@ const ts = {
   anchored_total: months.map(() => 0),
   anchored_on_posidonia: months.map(() => 0),
   large_on_posidonia: months.map(() => 0),
+  ais_matched_on_posidonia: months.map(() => 0),
+  ais_stationary_on_posidonia: months.map(() => 0),
   by_country: {},
 };
 const hotspotCandidates = [];
@@ -110,6 +126,19 @@ for (const [i, row] of rows.entries()) {
     points.month.push(mi);
     points.length_m.push(len);
     points.country.push(row.country);
+    // About half matched (larger boats more often); of confident matches ~60 % stationary, ~25 % at >= 5 kn
+    const matched = aisRand() < (isLarge ? 0.7 : 0.35);
+    const conf = matched ? round(aisRand() < 0.55 ? 0.9 + aisRand() * 0.1 : aisRand() * 0.9, 2) : null;
+    const u = aisRand();
+    const speed = matched ? round(u < 0.6 ? aisRand() * 0.6 : u < 0.75 ? 1 + aisRand() * 4 : 5 + aisRand() * 6, 1) : null;
+    points.ais_conf.push(conf);
+    points.ais_speed_kn.push(speed);
+    points.ais_length_m.push(matched ? round(len * (0.85 + aisRand() * 0.3), 1) : null);
+    points.ais_flag.push(matched ? (aisRand() < 0.7 ? LOCAL_FLAG[row.country] ?? 'MT' : OTHER_FLAGS[Math.floor(aisRand() * OTHER_FLAGS.length)]) : null);
+    if (conf !== null && conf >= AIS_CONF_MIN) {
+      ts.ais_matched_on_posidonia[mi]++;
+      if (speed < 1) ts.ais_stationary_on_posidonia[mi]++;
+    }
   }
   const density = clear === 0 ? null : round(row.on / clear, 4);
   hexes.h3.push(row.h3);
@@ -173,7 +202,7 @@ const meta = {
   methodology_version: '1-fixture',
   months,
   h3_resolution: RES,
-  params: { speed_kn_max: 1.0, posidonia_buffer_m: 20, large_length_m: 24 },
+  params: { speed_kn_max: 1.0, posidonia_buffer_m: 20, large_length_m: 24, ais_confidence_min: AIS_CONF_MIN },
   sources: [
     { name: 'GFW Sentinel-2 vessel detections', license: 'CC0-1.0', url: 'https://globalfishingwatch.org/data-download/' },
     { name: 'EMODnet Seabed Habitats – seagrass EOV 2025', license: 'CC-BY-4.0', url: 'https://emodnet.ec.europa.eu/en/seabed-habitats' },
