@@ -97,12 +97,31 @@ const sentinelYears = years.length > 1 ? `${years[0]}–${years[years.length - 1
       Monthly totals on the <a href={withBase('trends/')}>Trends</a> page are raw counts and are not normalised for cloud cover.
     </p>
 
+    <h2 id="ais">AIS matches</h2>
+    <p>
+      Larger boats broadcast their position, speed and identity over <abbr title="Automatic Identification System">AIS</abbr>.
+      Global Fishing Watch matches each Sentinel-2 detection against these broadcasts, and the match ships with its open data.
+      On the map, boats with a confident match (confidence ≥ {p.ais_confidence_min}) have a dark ring, and their popup shows
+      their flag state and the length and speed they reported. “Only boats with an AIS match” hides all others.
+    </p>
+    <p>
+      AIS also checks the method: a boat counted as anchored should report almost no speed. For confidently matched boats
+      anchored on Posidonia in 2025-07 and 2026-08, only about 60 % reported less than {p.speed_kn_max} kn, and about a
+      quarter reported 5 kn or more. These boats were under way when the image was taken. The image-based speed misses them.
+      The popup marks them as moving. The counts on this site still include them, and boats without AIS cannot be checked.
+    </p>
+    <p>
+      No vessel names, MMSI numbers or other identifiers are published. A flag is shared by thousands of boats.
+      Matched boats are mostly larger and more often commercial than the average boat here, so they are not a
+      representative sample.
+    </p>
+
     <h2>Limitations</h2>
     <ul>
       <li><strong>Small boats are missed.</strong> With 10 m pixels, vessels shorter than roughly 10–15 m are detected unreliably or not at all. Most leisure boats are in that range, so the true number of anchored boats is much higher than shown.</li>
       <li><strong>Moorings look like anchoring.</strong> A boat on a legal, eco-designed mooring buoy above a meadow looks the same from space as one dropping an anchor into it.</li>
       <li><strong>Pressure, not proof.</strong> Detections are indicators of anchoring pressure, not evidence that any individual skipper broke a rule. Do not use this map to accuse individual vessels.</li>
-      <li><strong>Speed is inferred.</strong> Speed is estimated from the image (e.g. wakes), so slowly moving boats may be counted as anchored and vice versa.</li>
+      <li><strong>Speed is inferred.</strong> Speed is estimated from the image (e.g. wakes), so moving boats may be counted as anchored and vice versa. Where AIS can check it, a large share of “anchored” boats were moving (see <a href="#ais">AIS matches</a>).</li>
       <li><strong>Seagrass maps are incomplete.</strong> EMODnet combines many surveys of different ages and precision; unmapped meadows are invisible here, and some polygons may include sand patches or dead matte.</li>
       <li><strong>Snapshot sampling.</strong> Sentinel-2 passes every few days at around 10:30–11:00 local time; boats anchoring only overnight or in the afternoon are under-sampled.</li>
     </ul>
