@@ -46,6 +46,13 @@ jobs:
       - run: uv sync --locked
         working-directory: pipeline
 
+      # Stop before hours of downloads if the pipeline code is broken.
+      - name: Lint and test
+        working-directory: pipeline
+        run: |
+          uv run --locked flake8
+          uv run --locked pytest
+
       - name: Restore pipeline cache
         env:
           GH_TOKEN: ${{ github.token }}
