@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Meta } from './data';
 
-export const DEFAULT_PARAMS: Meta['params'] = { speed_kn_max: 1.0, posidonia_buffer_m: 20, large_length_m: 24 };
+export const DEFAULT_PARAMS: Meta['params'] = { speed_kn_max: 1.0, posidonia_buffer_m: 20, large_length_m: 24, ais_confidence_min: 0.9 };
 
 let cached: Meta | null | undefined;
 

@@ -10,7 +10,7 @@ import {
   SEASON_LABEL, seasonOf,
   type Meta, type Hexes, type HexesMonthly, type Points, type Hotspot, type Timeseries, type Season,
 } from './data';
-import { countryName, setCountryNames } from './countries';
+import { countryName, flagEmoji, flagName, setCountryNames } from './countries';
 import { createTimeline, type Range } from './timeline';
 import { createSelect } from './select';
 
@@ -73,11 +73,13 @@ interface State {
   showSmall: boolean;
   /** Single boats at or above the large-boat length (pink). */
   showLarge: boolean;
+  /** Only single boats with a confident AIS match. */
+  aisOnly: boolean;
   /** Selected calendar months (indices into `calendar`), null = all. */
   range: Range;
 }
 
-const state: State = { metric: 'on_posidonia', season: 'ALL', showHexes: true, showPosidonia: true, showSmall: true, showLarge: true, range: null };
+const state: State = { metric: 'on_posidonia', season: 'ALL', showHexes: true, showPosidonia: true, showSmall: true, showLarge: true, aisOnly: false, range: null };
 
 let meta: Meta | null = null;
 let hexes: Hexes | null = null;
@@ -92,6 +94,8 @@ let posidoniaGeojson: GeoJSON.FeatureCollection | null = null;
 let pointsLoading = false;
 let posidoniaLoading = false;
 let largeLen = 24;
+/** GFW matching_confidence from which an AIS match counts (meta.params.ais_confidence_min). */
+let aisMin = 0.9;
 
 function setStatus(msg: string | null) {
   const el = $('map-status');
@@ -117,11 +121,21 @@ function buildPointsGeojson(p: Points): GeoJSON.FeatureCollection {
   for (let i = 0; i < n; i++) {
     features[i] = {
       type: 'Feature',
-      properties: { m: p.month?.[i] ?? -1, L: p.length_m?.[i] ?? 0, c: p.country?.[i] ?? 'UNK' },
+      // a: 1 for a confident AIS match; the AIS details stay off unmatched points to keep the source small
+      properties: {
+        m: p.month?.[i] ?? -1, L: p.length_m?.[i] ?? 0, c: p.country?.[i] ?? 'UNK',
+        ...aisProps(p, i),
+      },
       geometry: { type: 'Point', coordinates: [p.lon[i], p.lat[i]] },
     };
   }
   return { type: 'FeatureCollection', features };
+}
+
+function aisProps(p: Points, i: number) {
+  const conf = p.ais_conf?.[i];
+  if (conf == null) return { a: 0 };
+  return { a: conf >= aisMin ? 1 : 0, ac: conf, as: p.ais_speed_kn?.[i] ?? null, al: p.ais_length_m?.[i] ?? null, af: p.ais_flag?.[i] ?? null };
 }
 
 /** Quantile class breaks over positive, finite values. Returns ascending unique thresholds (<= 4). */
@@ -339,12 +353,25 @@ function hexPopupHtml(i: number): string {
 }
 
 function pointPopupHtml(f: MapGeoJSONFeature): string {
-  const p = f.properties as { m: number; L: number; c: string };
+  const p = f.properties as { m: number; L: number; c: string; a: number; ac?: number; as?: number | null; al?: number | null; af?: string | null };
   const month = meta?.months?.[p.m];
   const large = p.L >= largeLen;
   return `<div class="text-xs"><div class="font-semibold">${escapeHtml(fmtMonth(month ?? '?'))}</div>
     <div>${fmtNum(p.L, 1)} m${large ? ' <span class="font-semibold" style="color:var(--point-large)">· large</span>' : ''}</div>
-    <div class="text-muted">${escapeHtml(countryName(p.c))}</div></div>`;
+    <div class="text-muted">${escapeHtml(countryName(p.c))}</div>${aisPopupHtml(p)}</div>`;
+}
+
+/** AIS block of the boat popup. Only confident matches name a flag, so an uncertain match never pins a country on a boat. */
+function aisPopupHtml(p: { a: number; ac?: number; as?: number | null; al?: number | null; af?: string | null }): string {
+  if (p.ac == null) return '<div class="mt-1 border-t border-line pt-1 text-muted">No AIS match</div>';
+  if (!p.a) return `<div class="mt-1 border-t border-line pt-1 text-muted">Uncertain AIS match (confidence ${fmtNum(p.ac, 2)})</div>`;
+  const maxKn = meta?.params?.speed_kn_max ?? 1;
+  const flag = p.af ? `<div><span class="text-base leading-none">${flagEmoji(p.af)}</span> ${escapeHtml(flagName(p.af))} flag</div>` : '';
+  const facts = [p.al != null ? `${fmtNum(p.al, 1)} m` : null, p.as != null ? `${fmtNum(p.as, 1)} kn` : null].filter(Boolean).join(' · ');
+  const moving = p.as != null && p.as >= maxKn
+    ? `<div class="font-semibold" style="color:var(--point-large)">AIS reports it moving</div>` : '';
+  return `<div class="mt-1 border-t border-line pt-1"><div class="font-medium text-ink-2">AIS match</div>${flag}
+    ${facts ? `<div class="text-muted">${facts} reported</div>` : ''}${moving}</div>`;
 }
 
 export async function initMap() {
@@ -358,6 +385,7 @@ export async function initMap() {
   meta = m;
   if (ts?.by_country) setCountryNames(Object.fromEntries(Object.entries(ts.by_country).map(([k, v]) => [k, v.name])));
   largeLen = meta?.params?.large_length_m ?? 24;
+  aisMin = meta?.params?.ais_confidence_min ?? 0.9;
   calendar = buildCalendar(meta?.months ?? []);
   if (hx && Array.isArray(hx.h3) && hx.h3.length > 0) {
     hexes = hx;
@@ -405,6 +433,7 @@ export async function initMap() {
   state.showPosidonia = checked('toggle-posidonia');
   state.showSmall = checked('toggle-small');
   state.showLarge = checked('toggle-large');
+  state.aisOnly = document.querySelector<HTMLInputElement>('#toggle-ais')?.checked ?? false;
   const metric = document.querySelector<HTMLInputElement>('input[name="metric"]:checked')?.value;
   if (metric) state.metric = metric as Metric;
 
@@ -480,8 +509,9 @@ export async function initMap() {
           'circle-radius': ['interpolate', ['linear'], ['zoom'],
             11, ['interpolate', ['linear'], ['get', 'L'], 8, 2, largeLen, 3.5, 60, 6],
             15, ['interpolate', ['linear'], ['get', 'L'], 8, 4, largeLen, 7, 60, 12]],
-          'circle-stroke-color': cssVar('--surface'),
-          'circle-stroke-width': 1,
+          // confident AIS matches get a dark ring
+          'circle-stroke-color': ['case', ['==', ['get', 'a'], 1], cssVar('--ink'), cssVar('--surface')],
+          'circle-stroke-width': ['case', ['==', ['get', 'a'], 1], 2, 1],
           'circle-opacity': 0.9,
         },
       });
@@ -496,6 +526,7 @@ export async function initMap() {
     if (sel !== null) conds.push(['in', ['get', 'm'], ['literal', sel]]);
     if (!state.showSmall) conds.push(['>=', ['get', 'L'], largeLen]);
     if (!state.showLarge) conds.push(['<', ['get', 'L'], largeLen]);
+    if (state.aisOnly) conds.push(['==', ['get', 'a'], 1]);
     map.setFilter('points', conds.length ? (['all', ...conds] as ExpressionSpecification) : null);
   }
 
@@ -747,6 +778,10 @@ export async function initMap() {
       ensurePoints();
     });
   }
+  $<HTMLInputElement>('toggle-ais').addEventListener('change', (e) => {
+    state.aisOnly = (e.target as HTMLInputElement).checked;
+    applyPointFilter();
+  });
   const list = $('hotspot-list');
   if (!hs || !Array.isArray(hs) || hs.length === 0) {
     list.innerHTML = '<li class="px-2 py-4 text-center text-xs text-muted">No hotspots published yet.</li>';
