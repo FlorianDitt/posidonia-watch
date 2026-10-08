@@ -60,8 +60,8 @@ def meta_obj(months: list[str], cfg, gfw_url: str) -> dict:
             {"name": "EMODnet Seabed Habitats – Seagrass cover (EOV), version 2025", "license": "CC-BY-4.0",
              "url": "https://emodnet.ec.europa.eu/geonetwork/srv/eng/catalog.search#/metadata/"
                     "39746d9c-4220-425c-bc26-7cb3056c36a5"},
-            {"name": "Flanders Marine Institute – Maritime Boundaries Geodatabase (EEZ), version 12", "license": "CC-BY-4.0",
-             "url": "https://doi.org/10.14284/632"},
+            {"name": "Flanders Marine Institute – Maritime Boundaries Geodatabase (EEZ), version 12",
+             "license": "CC-BY-4.0", "url": "https://doi.org/10.14284/632"},
         ],
         "bbox": list(cfg.bbox),
     }
@@ -154,7 +154,8 @@ def write_posidonia_geojson(posidonia: gpd.GeoDataFrame, path: Path, tolerance_m
             geom = _polygonal_only(geom)
             if geom is None:
                 continue
-            feats.append({"type": "Feature", "properties": {"id": int(pid)}, "geometry": shapely.geometry.mapping(geom)})
+            feats.append({"type": "Feature", "properties": {"id": int(pid)},
+                          "geometry": shapely.geometry.mapping(geom)})
         fc = {"type": "FeatureCollection", "features": feats}
         text = json.dumps(fc, separators=(",", ":"))
         if len(text.encode()) < target_bytes:
@@ -202,7 +203,8 @@ def validate_outputs(out_dir: Path) -> None:
     for k in ("generated_at", "methodology_version", "months", "h3_resolution", "params", "sources", "bbox"):
         _check(k in meta, f"meta.json missing {k}")
     months = meta["months"]
-    _check(months == sorted(months) and all(len(m) == 7 and m[4] == "-" for m in months), "meta.months must be sorted YYYY-MM")
+    _check(months == sorted(months) and all(len(m) == 7 and m[4] == "-" for m in months),
+           "meta.months must be sorted YYYY-MM")
     _check(set(meta["params"]) >= {"speed_kn_max", "posidonia_buffer_m", "large_length_m"}, "meta.params keys")
     _check(len(meta["bbox"]) == 4, "meta.bbox")
     _check(all({"name", "license", "url"} <= set(s) for s in meta["sources"]), "meta.sources entries")
@@ -225,7 +227,8 @@ def validate_outputs(out_dir: Path) -> None:
         _check(set(hx[key]) == set(SEASONS), f"hexes.{key} keys")
         for s in SEASONS:
             _check(len(hx[key][s]) == m, f"hexes.{key}.{s} length")
-    _check(all(h3.is_valid_cell(c) and h3.get_resolution(c) == meta["h3_resolution"] for c in hx["h3"][:1000]), "hexes.h3 cells")
+    _check(all(h3.is_valid_cell(c) and h3.get_resolution(c) == meta["h3_resolution"] for c in hx["h3"][:1000]),
+           "hexes.h3 cells")
     for d, c in zip(hx["density"], hx["clear_overpasses"]):
         _check((d is None) == (c == 0), "hexes.density must be null iff clear_overpasses == 0")
 

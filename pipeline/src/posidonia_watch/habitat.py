@@ -195,7 +195,9 @@ def fetch_eez(wfs: str, layer: str, bbox, out_path: Path) -> gpd.GeoDataFrame:
     return gdf
 
 
-def assign_country(lon: np.ndarray, lat: np.ndarray, eez: gpd.GeoDataFrame | None, max_distance_m: float = 20000) -> np.ndarray:
+def assign_country(
+    lon: np.ndarray, lat: np.ndarray, eez: gpd.GeoDataFrame | None, max_distance_m: float = 20000
+) -> np.ndarray:
     """ISO3 of the EEZ containing each point ("UNK" if none / no EEZ data).
 
     Points inside several polygons (joint regimes, overlapping claims) get the
