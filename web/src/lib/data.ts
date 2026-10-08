@@ -63,6 +63,11 @@ export interface HexesMonthly {
   large_on_posidonia: number[];
   /** Dense, cell-major: cell i, month k at i * months.length + k. */
   clear_overpasses: number[];
+  /** Row-aligned with on_posidonia; missing in data built before AIS matching. */
+  ais_on_posidonia?: number[];
+  ais_large_on_posidonia?: number[];
+  ais_stationary_on_posidonia?: number[];
+  ais_stationary_large_on_posidonia?: number[];
 }
 
 export interface Points {
