@@ -20,7 +20,10 @@ dependencies = [
 posidonia-watch = "posidonia_watch.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "flake8>=7.4.1",
+    "pytest>=8",
+]
 
 [build-system]
 requires = ["hatchling"]
