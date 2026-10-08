@@ -94,6 +94,11 @@ const ts = {
   ais_stationary_on_posidonia: months.map(() => 0),
   by_country: {},
 };
+// Sparse (cell, month) rows plus dense clear overpasses, as in docs/data-contract.md
+const hexesMonthly = {
+  months, cell: [], month: [], on_posidonia: [], large_on_posidonia: [], ais_on_posidonia: [],
+  ais_large_on_posidonia: [], ais_stationary_on_posidonia: [], ais_stationary_large_on_posidonia: [], clear_overpasses: [],
+};
 const hotspotCandidates = [];
 const cum = [];
 let acc = 0;
@@ -104,6 +109,8 @@ for (const [i, row] of rows.entries()) {
   const clear = i % 97 === 5 ? 0 : Math.round(110 + rand() * 90);
   const seasons = { DJF: 0, MAM: 0, JJA: 0, SON: 0 };
   const perMonth = months.map(() => 0);
+  // per month: [all, large, ais, ais large, ais stationary, ais stationary large]
+  const cellMonth = months.map(() => [0, 0, 0, 0, 0, 0]);
   let large = 0;
   const [clat, clon] = cellToLatLng(row.h3);
   const cc = (ts.by_country[row.country] ??= {
@@ -135,11 +142,33 @@ for (const [i, row] of rows.entries()) {
     points.ais_speed_kn.push(speed);
     points.ais_length_m.push(matched ? round(len * (0.85 + aisRand() * 0.3), 1) : null);
     points.ais_flag.push(matched ? (aisRand() < 0.7 ? LOCAL_FLAG[row.country] ?? 'MT' : OTHER_FLAGS[Math.floor(aisRand() * OTHER_FLAGS.length)]) : null);
+    const cm = cellMonth[mi];
+    cm[0]++;
+    if (isLarge) cm[1]++;
     if (conf !== null && conf >= AIS_CONF_MIN) {
       ts.ais_matched_on_posidonia[mi]++;
-      if (speed < 1) ts.ais_stationary_on_posidonia[mi]++;
+      cm[2]++;
+      if (isLarge) cm[3]++;
+      if (speed < 1) {
+        ts.ais_stationary_on_posidonia[mi]++;
+        cm[4]++;
+        if (isLarge) cm[5]++;
+      }
     }
   }
+  cellMonth.forEach((cm, mi) => {
+    if (cm[0] === 0) return;
+    hexesMonthly.cell.push(i);
+    hexesMonthly.month.push(mi);
+    hexesMonthly.on_posidonia.push(cm[0]);
+    hexesMonthly.large_on_posidonia.push(cm[1]);
+    hexesMonthly.ais_on_posidonia.push(cm[2]);
+    hexesMonthly.ais_large_on_posidonia.push(cm[3]);
+    hexesMonthly.ais_stationary_on_posidonia.push(cm[4]);
+    hexesMonthly.ais_stationary_large_on_posidonia.push(cm[5]);
+  });
+  // spread the cell's clear overpasses evenly over the months (no extra random draws)
+  months.forEach((_, mi) => hexesMonthly.clear_overpasses.push(Math.floor(clear / months.length) + (mi < clear % months.length ? 1 : 0)));
   const density = clear === 0 ? null : round(row.on / clear, 4);
   hexes.h3.push(row.h3);
   hexes.country.push(row.country);
@@ -213,6 +242,7 @@ const meta = {
 const write = (name, obj) => writeFileSync(join(OUT, name), JSON.stringify(obj));
 write('meta.json', meta);
 write('timeseries.json', ts);
+write('hexes_monthly.json', hexesMonthly);
 write('hexes.json', hexes);
 write('points.json', sortedPoints);
 write('hotspots.json', hotspots);
