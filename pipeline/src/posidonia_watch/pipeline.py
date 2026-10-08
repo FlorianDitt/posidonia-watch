@@ -53,7 +53,9 @@ def ensure_reference(cfg: Config, refresh: bool = False):
     p = _paths(cfg)
     s = cfg.sources
     if refresh or not p["posidonia"].exists():
-        posidonia = habitat.fetch_posidonia(s["emodnet_wfs"], s["emodnet_layer"], s["emodnet_filter"], cfg.bbox, p["posidonia"])
+        posidonia = habitat.fetch_posidonia(
+            s["emodnet_wfs"], s["emodnet_layer"], s["emodnet_filter"], cfg.bbox, p["posidonia"]
+        )
         p["cells"].unlink(missing_ok=True)
     else:
         posidonia = gpd.read_parquet(p["posidonia"])
@@ -189,7 +191,8 @@ def _load_cached(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame, list[str], di
             o = o[o["month"] == mon]
         dets.append(d)
         ovps.append(o)
-    det = pd.concat(dets, ignore_index=True) if dets else pd.DataFrame(columns=list(ingest.DETECTION_COLUMNS) + ["month"])
+    det = (pd.concat(dets, ignore_index=True) if dets
+           else pd.DataFrame(columns=list(ingest.DETECTION_COLUMNS) + ["month"]))
     ovp = pd.concat(ovps, ignore_index=True) if ovps else pd.DataFrame(columns=list(ingest.OVERPASS_COLUMNS))
     months = sorted(set(ovp["month"]) | set(det["month"]))
     return det, ovp, months, manifest
@@ -214,7 +217,8 @@ def build(cfg: Config) -> dict:
     anch["country"] = "UNK"
     on = anch["on_posidonia"].to_numpy()
     anch.loc[on, "country"] = habitat.assign_country(
-        anch.loc[on, "lon"].to_numpy(), anch.loc[on, "lat"].to_numpy(), eez, cfg.sources.get("eez_max_distance_m", 20000)
+        anch.loc[on, "lon"].to_numpy(), anch.loc[on, "lat"].to_numpy(), eez,
+        cfg.sources.get("eez_max_distance_m", 20000),
     )
     names = habitat.country_names(eez)
 
@@ -234,7 +238,9 @@ def build(cfg: Config) -> dict:
     export.write_json(out / "hexes_monthly.json", export.hexes_monthly_obj(monthly_rows, monthly_clear, months))
     export.write_json(out / "points.json", export.points_obj(anch, months, cfg.output.get("points_cap", 200_000), nd))
     export.write_json(out / "hotspots.json", export.hotspots_obj(hot, nd))
-    tol = export.write_posidonia_geojson(posidonia, out / "posidonia.geojson", cfg.output.get("posidonia_simplify_m", 30))
+    tol = export.write_posidonia_geojson(
+        posidonia, out / "posidonia.geojson", cfg.output.get("posidonia_simplify_m", 30)
+    )
     log.info("posidonia.geojson written (simplify %.0f m)", tol)
     export.validate_outputs(out)
 
@@ -249,4 +255,3 @@ def build(cfg: Config) -> dict:
     }
     log.info("Build summary: %s", summary)
     return summary
-

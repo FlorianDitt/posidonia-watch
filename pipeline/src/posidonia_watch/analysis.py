@@ -122,7 +122,9 @@ def monthly_totals(anch: pd.DataFrame, months: list[str]) -> pd.DataFrame:
     out = pd.DataFrame(index=pd.Index(months, name="month"))
     out["anchored_total"] = g.size()
     out["anchored_on_posidonia"] = g["on_posidonia"].sum()
-    out["large_on_posidonia"] = g.apply(lambda x: int((x["on_posidonia"] & x["large"]).sum()), include_groups=False) if len(anch) else 0
+    out["large_on_posidonia"] = (
+        g.apply(lambda x: int((x["on_posidonia"] & x["large"]).sum()), include_groups=False) if len(anch) else 0
+    )
     return out.fillna(0).astype(int)
 
 
@@ -162,7 +164,8 @@ def aggregate_hexes(
     cells = cells.set_index("h3")
     extra = sorted(set(on["h3"]) - set(cells.index))
     if extra:  # should not happen (cells are built from the same buffered polygons)
-        cells = pd.concat([cells, pd.DataFrame({"country": "UNK", "posidonia_km2": 0.0}, index=pd.Index(extra, name="h3"))])
+        missing = pd.DataFrame({"country": "UNK", "posidonia_km2": 0.0}, index=pd.Index(extra, name="h3"))
+        cells = pd.concat([cells, missing])
     idx = cells.index
     hexes = pd.DataFrame(index=idx)
     hexes["country"] = cells["country"]
@@ -218,7 +221,8 @@ def hex_monthly(
     clear = np.zeros((len(hex_ids), len(months)), dtype=np.int64)
     ovp = overpass[overpass["month"].isin(months) & overpass["h3_id"].isin(pos.index)]
     agg = ovp.groupby(["h3_id", "month"])["overpasses_cloud_under_20"].sum().reset_index()
-    clear[pos.reindex(agg["h3_id"]).to_numpy(), midx.reindex(agg["month"]).to_numpy()] = agg["overpasses_cloud_under_20"]
+    rows_i, cols_i = pos.reindex(agg["h3_id"]).to_numpy(), midx.reindex(agg["month"]).to_numpy()
+    clear[rows_i, cols_i] = agg["overpasses_cloud_under_20"]
     return rows, clear
 
 
