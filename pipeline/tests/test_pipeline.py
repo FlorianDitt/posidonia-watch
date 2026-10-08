@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+import pandas as pd
 
 from posidonia_watch import export, ingest, pipeline
 from posidonia_watch.config import Config
@@ -56,3 +57,18 @@ def test_num_makes_values_json_safe():
     assert export._num(2.345678, 2) == 2.35
     assert export._num(2.6, 0) == 3
     assert not math.isnan(export._num(np.float32(1.5)))
+
+
+def test_points_obj_publishes_ais_values_only_for_matches_and_never_the_mmsi():
+    anch = pd.DataFrame({
+        "on_posidonia": [True, True], "month": ["2025-07", "2025-07"],
+        "detect_timestamp": ["2025-07-02", "2025-07-01"], "lon": [3.0, 3.1], "lat": [42.0, 42.1],
+        "length_m_inferred": [30.0, 12.0], "country": ["FRA", "FRA"], "mmsi": ["227000000", None],
+        "ais_matched": [True, False], "matching_confidence": [0.971, 0.4],
+        "ais_speed_kn": [0.24, np.nan], "ais_length_m": [33.0, 15.0],
+    })
+    pts = export.points_obj(anch, ["2025-07"], cap=10)
+    assert "mmsi" not in pts
+    assert pts["ais_conf"] == [0.97, None]
+    assert pts["ais_speed_kn"] == [0.2, None]
+    assert pts["ais_length_m"] == [33.0, None]

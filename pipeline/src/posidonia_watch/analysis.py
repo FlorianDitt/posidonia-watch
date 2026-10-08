@@ -63,6 +63,27 @@ def anchored_mask(df: pd.DataFrame, params: dict, filters: dict) -> np.ndarray:
     return (speed < params["speed_kn_max"]) & quality_mask(df, filters)
 
 
+def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
+    """AIS view of each detection: matched, reported speed, and whether the match can check "anchored".
+
+    ``ais_speed_kn`` is the mean of the speeds reported just before and after the image (NaN unless both
+    exist). A detection is ``ais_checked`` when its match is confident and has that speed, and
+    ``ais_stationary`` when the checked speed is below ``speed_kn_max``.
+    """
+    mmsi = df["mmsi"]
+    matched = (mmsi.notna() & (mmsi.astype(str).str.strip() != "")).to_numpy()
+    conf = pd.to_numeric(df["matching_confidence"], errors="coerce").to_numpy(dtype=float)
+    speed = ((pd.to_numeric(df["ais_speed_kn_before"], errors="coerce")
+              + pd.to_numeric(df["ais_speed_kn_after"], errors="coerce")) / 2).to_numpy(dtype=float)
+    checked = matched & (conf >= params["ais_confidence_min"]) & ~np.isnan(speed)
+    return pd.DataFrame({
+        "ais_matched": matched,
+        "ais_speed_kn": np.where(matched, speed, np.nan),
+        "ais_checked": checked,
+        "ais_stationary": checked & (speed < params["speed_kn_max"]),
+    }, index=df.index)
+
+
 def dedupe(df: pd.DataFrame) -> pd.DataFrame:
     """Drop the same detection reported in two processing versions of a scene."""
     key = (
@@ -109,6 +130,7 @@ def classify(
     anch = det.loc[anchored_mask(det, params, filters)].copy()
     anch["on_posidonia"] = points_within(anch["lon"].to_numpy(), anch["lat"].to_numpy(), posidonia_buffered_metric)
     anch["large"] = anch["length_m_inferred"].to_numpy(dtype=float) >= params["large_length_m"]
+    anch[["ais_matched", "ais_speed_kn", "ais_checked", "ais_stationary"]] = ais_fields(anch, params)
     anch["h3"] = None
     on = anch["on_posidonia"].to_numpy()
     if on.any():
@@ -117,7 +139,7 @@ def classify(
 
 
 def monthly_totals(anch: pd.DataFrame, months: list[str]) -> pd.DataFrame:
-    """Per month: anchored_total, anchored_on_posidonia, large_on_posidonia."""
+    """Per month: anchored_total, anchored_on_posidonia, large_on_posidonia and the AIS check counts."""
     g = anch.groupby("month")
     out = pd.DataFrame(index=pd.Index(months, name="month"))
     out["anchored_total"] = g.size()
@@ -125,6 +147,9 @@ def monthly_totals(anch: pd.DataFrame, months: list[str]) -> pd.DataFrame:
     out["large_on_posidonia"] = (
         g.apply(lambda x: int((x["on_posidonia"] & x["large"]).sum()), include_groups=False) if len(anch) else 0
     )
+    on = anch[anch["on_posidonia"]].groupby("month")
+    out["ais_matched_on_posidonia"] = on["ais_checked"].sum()
+    out["ais_stationary_on_posidonia"] = on["ais_stationary"].sum()
     return out.fillna(0).astype(int)
 
 
