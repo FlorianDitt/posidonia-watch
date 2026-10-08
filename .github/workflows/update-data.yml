@@ -1,11 +1,15 @@
 name: Update data
 
-# Fetches GFW releases that are not cached yet and, if there are any, rebuilds
-# web/public/data and opens an auto-merging pull request. Merging it deploys the site.
+# Fetches GFW releases that are not cached yet, rebuilds web/public/data and, if
+# the data changed, opens an auto-merging pull request. Merging it deploys the
+# site. Rebuilding on every run also retries a build or pull request that failed
+# after its releases were already cached.
 #
-# The filtered cache (pipeline/data/cache, ~650 MB) lives as a tarball on the
+# The filtered cache (pipeline/data/cache, ~650 MB) lives as `cache.tar` on the
 # `pipeline-cache` release, because `build` aggregates every cached month and
-# actions/cache evicts entries unused for 7 days.
+# actions/cache evicts entries unused for 7 days. The workflow never starts from
+# an empty cache: to seed or replace it, upload a tarball made locally with
+# `tar -cf cache.tar -C pipeline/data cache`.
 #
 # Needs the secret PIPELINE_PAT: a fine-grained token for this repository with
 # Contents and Pull requests read/write. Pushes and pull requests made with the
@@ -15,14 +19,9 @@ on:
   schedule:
     - cron: "17 6 * * 1"  # weekly: GFW publishes around the 19th, but irregularly
   workflow_dispatch:
-    inputs:
-      rebuild:
-        description: Rebuild the site data even if no new release was fetched
-        type: boolean
-        default: false
 
 permissions:
-  contents: write  # upload the cache tarball to the pipeline-cache release
+  contents: write  # replace the cache tarball on the pipeline-cache release
 
 concurrency:
   group: update-data
@@ -40,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          token: ${{ secrets.PIPELINE_PAT || github.token }}
+          persist-credentials: false  # only the pull request step gets a token
 
       - uses: astral-sh/setup-uv@v10.2.0  # no floating major tag is published
 
@@ -51,63 +50,86 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          gh release download "$CACHE_TAG" --pattern "$CACHE_ASSET" --dir "$RUNNER_TEMP"
           mkdir -p pipeline/data
-          if gh release download "$CACHE_TAG" --pattern "$CACHE_ASSET" --dir "$RUNNER_TEMP"; then
-            tar -xf "$RUNNER_TEMP/$CACHE_ASSET" -C pipeline/data
-            rm "$RUNNER_TEMP/$CACHE_ASSET"
-          else
-            echo "::warning::No pipeline cache on release $CACHE_TAG – fetching everything from scratch"
-          fi
-          manifest=pipeline/data/cache/manifest.json
-          if [ -f "$manifest" ]; then cp "$manifest" "$RUNNER_TEMP/manifest.before.json"; else echo '{}' > "$RUNNER_TEMP/manifest.before.json"; fi
+          tar -xf "$RUNNER_TEMP/$CACHE_ASSET" -C pipeline/data
+          rm "$RUNNER_TEMP/$CACHE_ASSET"
+          cp pipeline/data/cache/manifest.json "$RUNNER_TEMP/manifest.before.json"
 
-      # Annual files take ~30 min each; whatever is left over is fetched next run.
+      # Monthly releases take a few minutes each; whatever is left over is fetched next run.
       - name: Fetch new GFW releases
         working-directory: pipeline
-        run: uv run --locked posidonia-watch update --no-build --max-minutes 240
+        run: uv run --locked posidonia-watch update --no-build --max-minutes 180
 
       - name: List newly fetched releases
         id: new
         run: |
-          manifest=pipeline/data/cache/manifest.json
-          [ -f "$manifest" ] || echo '{}' > "$manifest"
-          periods=$(jq -rn --slurpfile a "$RUNNER_TEMP/manifest.before.json" --slurpfile b "$manifest" '
+          periods=$(jq -rn --slurpfile a "$RUNNER_TEMP/manifest.before.json" --slurpfile b pipeline/data/cache/manifest.json '
             [$b[0] | to_entries[] | select($a[0][.key].record_id != .value.record_id) | .key
              | if length == 6 then .[0:4] + "-" + .[4:6] else . end] | join(", ")')
           echo "periods=$periods" >> "$GITHUB_OUTPUT"
           echo "Newly fetched: ${periods:-none}"
 
-      # Saved before building, so hours of downloads survive a failed build.
+      # Saved before building, so downloads survive a failed build. Uploaded under a
+      # temporary name first: --clobber would delete the old asset before the new one is complete.
       - name: Save pipeline cache
         if: steps.new.outputs.periods != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tar -cf "$RUNNER_TEMP/$CACHE_ASSET" -C pipeline/data cache
-          gh release upload "$CACHE_TAG" "$RUNNER_TEMP/$CACHE_ASSET" --clobber
+          tmp="cache-$GITHUB_RUN_ID.tar"
+          tar -cf "$RUNNER_TEMP/$tmp" -C pipeline/data cache
+          gh release upload "$CACHE_TAG" "$RUNNER_TEMP/$tmp"
+          gh release delete-asset "$CACHE_TAG" "$CACHE_ASSET" --yes
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$CACHE_TAG" --jq ".assets[] | select(.name == \"$tmp\") | .id")
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name="$CACHE_ASSET" --silent
 
       - name: Build site data
-        if: steps.new.outputs.periods != '' || inputs.rebuild
         working-directory: pipeline
         run: uv run --locked posidonia-watch build
 
+      - name: Compare with the published data
+        id: data
+        run: |
+          meta=web/public/data/meta.json
+          git show "HEAD:$meta" > "$RUNNER_TEMP/meta.main.json"
+          dropped=$(jq -rn --slurpfile a "$RUNNER_TEMP/meta.main.json" --slurpfile b "$meta" '$a[0].months - $b[0].months | join(", ")')
+          if [ -n "$dropped" ]; then
+            echo "::error::The rebuilt data lacks published months: $dropped"
+            exit 1
+          fi
+          added=$(jq -rn --slurpfile a "$RUNNER_TEMP/meta.main.json" --slurpfile b "$meta" '
+            ($b[0].months - $a[0].months) as $m
+            | if ($m | length) > 3 then "\($m | length) months (\($m[0]) to \($m[-1]))" else $m | join(", ") end')
+          echo "added=$added" >> "$GITHUB_OUTPUT"
+          # generated_at changes on every build; anything else is a real change.
+          if git diff --quiet -- web/public/data ":!$meta" &&
+             [ "$(jq -c 'del(.generated_at)' "$RUNNER_TEMP/meta.main.json")" = "$(jq -c 'del(.generated_at)' "$meta")" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Site data unchanged"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Open data pull request
-        if: steps.new.outputs.periods != '' || inputs.rebuild
+        if: steps.data.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.PIPELINE_PAT }}
-          PERIODS: ${{ steps.new.outputs.periods }}
+          ADDED: ${{ steps.data.outputs.added }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
             echo "::error::Secret PIPELINE_PAT is not set; cannot open a pull request that runs CI"
             exit 1
           fi
-          if [ -n "$PERIODS" ]; then title="data: add GFW releases $PERIODS"; else title="data: rebuild"; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$ADDED" ]; then title="data: add $ADDED"; else title="data: rebuild"; fi
+          # Commit as the token owner, so the changes are attributed to the account that pushes them.
+          login=$(gh api user --jq .login)
+          git config user.name "$login"
+          git config user.email "$(gh api user --jq .id)+$login@users.noreply.github.com"
           git switch -C "$DATA_BRANCH"
           git add web/public/data
           git commit -m "$title"
-          git push --force origin "$DATA_BRANCH"
+          git push --force "https://x-access-token:$GH_TOKEN@${GITHUB_SERVER_URL#https://}/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/$DATA_BRANCH"
           body="Automated by the [Update data]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) workflow."
           if [ "$(gh pr view "$DATA_BRANCH" --json state --jq .state 2>/dev/null)" = OPEN ]; then
             gh pr edit "$DATA_BRANCH" --title "$title" --body "$body"
