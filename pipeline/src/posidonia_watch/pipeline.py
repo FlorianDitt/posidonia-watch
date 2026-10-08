@@ -113,6 +113,7 @@ def is_cached(cfg: Config, rel: zenodo.Release, manifest: dict) -> bool:
     return (
         entry is not None
         and entry.get("record_id") == rel.record_id
+        and entry.get("detections_schema", 1) == ingest.DETECTION_SCHEMA_VERSION
         and (p["detections"] / f"{rel.period}.parquet").exists()
         and (p["overpass"] / f"{rel.period}.parquet").exists()
     )
@@ -138,6 +139,7 @@ def fetch_release(cfg: Config, rel: zenodo.Release, cells: pd.DataFrame, force: 
         "published": rel.published,
         "detections_file": rel.detections_name,
         "overpass_file": rel.overpass_name,
+        "detections_schema": ingest.DETECTION_SCHEMA_VERSION,
         "detections_rows": n_det,
         "overpass_rows": n_ovp,
         "overpass_cells": len(ovp_cells),
@@ -191,8 +193,9 @@ def _load_cached(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame, list[str], di
             o = o[o["month"] == mon]
         dets.append(d)
         ovps.append(o)
-    det = (pd.concat(dets, ignore_index=True) if dets
-           else pd.DataFrame(columns=list(ingest.DETECTION_COLUMNS) + ["month"]))
+    # releases cached under an older schema lack the newer columns; they read as missing (NaN)
+    det = (pd.concat(dets, ignore_index=True) if dets else pd.DataFrame()).reindex(
+        columns=list(ingest.DETECTION_COLUMNS) + ["month"])
     ovp = pd.concat(ovps, ignore_index=True) if ovps else pd.DataFrame(columns=list(ingest.OVERPASS_COLUMNS))
     months = sorted(set(ovp["month"]) | set(det["month"]))
     return det, ovp, months, manifest

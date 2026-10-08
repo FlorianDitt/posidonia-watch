@@ -36,9 +36,14 @@ DETECTION_COLUMNS: dict[str, pa.DataType] = {
     "likely_infrastructure": pa.bool_(),
     "potential_ice": pa.bool_(),
     "matching_score": pa.float32(),
+    "matching_confidence": pa.float32(),
     "mmsi": pa.string(),
+    "ais_speed_kn_before": pa.float32(),
+    "ais_speed_kn_after": pa.float32(),
     "ais_length_m": pa.float32(),
 }
+# Bump when DETECTION_COLUMNS changes: cached releases with another version are fetched again.
+DETECTION_SCHEMA_VERSION = 2
 
 OVERPASS_COLUMNS: dict[str, pa.DataType] = {
     "h3_id": pa.string(),

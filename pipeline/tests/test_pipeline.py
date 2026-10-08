@@ -2,7 +2,8 @@ import math
 
 import numpy as np
 
-from posidonia_watch import export, pipeline
+from posidonia_watch import export, ingest, pipeline
+from posidonia_watch.config import Config
 from posidonia_watch.zenodo import Release
 
 
@@ -33,6 +34,18 @@ def test_releases_for_months_falls_back_to_annual_release():
 
 def test_releases_for_months_skips_months_without_a_release():
     assert pipeline.releases_for_months(RELEASES, ["2023-05"]) == []
+
+
+def test_is_cached_refetches_releases_cached_under_an_older_schema(tmp_path):
+    cfg = Config(raw={}, base_dir=tmp_path)
+    rel = _release("202501")
+    for d in ("detections", "overpass"):
+        (cfg.cache_dir / d).mkdir(parents=True)
+        (cfg.cache_dir / d / "202501.parquet").touch()
+    current = {"202501": {"record_id": rel.record_id, "detections_schema": ingest.DETECTION_SCHEMA_VERSION}}
+    legacy = {"202501": {"record_id": rel.record_id}}  # written before the schema was versioned
+    assert pipeline.is_cached(cfg, rel, current)
+    assert not pipeline.is_cached(cfg, rel, legacy)
 
 
 def test_num_makes_values_json_safe():
