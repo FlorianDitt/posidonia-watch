@@ -12,3 +12,17 @@ export function setCountryNames(extra: Record<string, string>) {
 }
 
 export const countryName = (iso3: string | null | undefined) => (iso3 ? names[iso3] ?? iso3 : 'Unknown');
+
+// Flag states of AIS matches come as ISO2 (from the MMSI's MID); names from the browser's own region list.
+let regionNames: Intl.DisplayNames | null = null;
+try {
+  regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+} catch {
+  // very old browser: show the code
+}
+
+export const flagName = (iso2: string) => regionNames?.of(iso2) ?? iso2;
+
+/** Regional-indicator pair, e.g. 'FR' -> 🇫🇷. Some systems (Windows) render it as the two letters. */
+export const flagEmoji = (iso2: string) =>
+  /^[A-Z]{2}$/.test(iso2) ? String.fromCodePoint(...[...iso2].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : '';

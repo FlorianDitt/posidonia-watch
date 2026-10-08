@@ -21,7 +21,7 @@ export interface Meta {
   methodology_version: string;
   months: string[];
   h3_resolution: number;
-  params: { speed_kn_max: number; posidonia_buffer_m: number; large_length_m: number };
+  params: { speed_kn_max: number; posidonia_buffer_m: number; large_length_m: number; ais_confidence_min?: number };
   sources: { name: string; license: string; url: string }[];
   bbox: [number, number, number, number];
 }
@@ -71,6 +71,12 @@ export interface Points {
   month: number[];
   length_m: number[];
   country: string[];
+  /** AIS match confidence, null without a match. The AIS fields are missing in data built before they existed. */
+  ais_conf?: (number | null)[];
+  ais_speed_kn?: (number | null)[];
+  ais_length_m?: (number | null)[];
+  /** ISO2 flag state of the matched vessel. */
+  ais_flag?: (string | null)[];
 }
 
 export interface Hotspot {

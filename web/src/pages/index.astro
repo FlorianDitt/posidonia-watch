@@ -108,6 +108,9 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
             <label class="flex items-center gap-2"><input type="checkbox" id="toggle-large" checked class="accent-[var(--point-large)]" />
               <span class="inline-flex w-4 justify-center"><span class="inline-block h-3 w-3 rounded-full" style="background:var(--point-large)"></span></span>
               <span>Large boats <span class="text-xs text-muted">(≥ {large} m)</span></span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="toggle-ais" class="accent-[var(--ink)]" />
+              <span class="inline-flex w-4 justify-center"><span class="inline-block h-3 w-3 rounded-full border-2 border-ink bg-surface"></span></span>
+              <span>Only boats with an AIS match <a class="text-xs text-muted underline" href={withBase('about/#ais')}>?</a></span></label>
             <p class="text-xs text-muted">Zoom in to see meadows and single boats.</p>
           </fieldset>
         </details>
