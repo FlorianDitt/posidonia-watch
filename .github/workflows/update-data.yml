@@ -68,11 +68,14 @@ jobs:
         working-directory: pipeline
         run: uv run --locked posidonia-watch update --no-build --max-minutes 180
 
+      # A release fetched again for a new detection schema keeps its record_id, so the schema
+      # version counts too. Without it the refetched cache would never be saved.
       - name: List newly fetched releases
         id: new
         run: |
           periods=$(jq -rn --slurpfile a "$RUNNER_TEMP/manifest.before.json" --slurpfile b pipeline/data/cache/manifest.json '
-            [$b[0] | to_entries[] | select($a[0][.key].record_id != .value.record_id) | .key
+            def version: [.record_id, (.detections_schema // 1)];
+            [$b[0] | to_entries[] | select(($a[0][.key] // {} | version) != (.value | version)) | .key
              | if length == 6 then .[0:4] + "-" + .[4:6] else . end] | join(", ")')
           echo "periods=$periods" >> "$GITHUB_OUTPUT"
           echo "Newly fetched: ${periods:-none}"
