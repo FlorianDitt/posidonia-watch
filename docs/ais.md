@@ -104,7 +104,9 @@ boats, and the MMSI it comes from is not published.
 **Published as counts**, per month (`timeseries.json`) and per hexagon and
 month (`hexes_monthly.json`): how many detections on Posidonia had a
 confident match, and how many of those AIS shows as stationary. The map uses
-the per-hexagon counts for its "AIS match" and "AIS: anchored" views.
+the per-hexagon counts for its "AIS match" and "AIS: anchored" views. Per
+month only, also how many of them AIS shows as moving, so the site does not
+count a match without an AIS speed as moving.
 
 The MMSI is still read into the pipeline's local cache (needed to tell a
 match from no match), and is dropped before anything is written to

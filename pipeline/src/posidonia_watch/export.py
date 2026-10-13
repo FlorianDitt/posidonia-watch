@@ -115,7 +115,7 @@ def hexes_monthly_obj(rows: pd.DataFrame, clear: np.ndarray, months: list[str]) 
         "month": [int(v) for v in rows["m"]],
         "on_posidonia": [int(v) for v in rows["n"]],
         "large_on_posidonia": [int(v) for v in rows["large"]],
-        **{key: [int(v) for v in rows[col]] for _, col, key in AIS_COUNTS},
+        **{key: [int(v) for v in rows[col]] for _, col, key in AIS_COUNTS if key},
         "clear_overpasses": [int(v) for v in clear.reshape(-1)],
     }
 
@@ -269,6 +269,9 @@ def validate_outputs(out_dir: Path) -> None:
     _check(ts["months"] == months, "timeseries.months != meta.months")
     for k in ("anchored_total", "anchored_on_posidonia", "large_on_posidonia", *(total for total, _, _ in AIS_COUNTS)):
         _check(len(ts[k]) == n and all(isinstance(v, int) for v in ts[k]), f"timeseries.{k}")
+    _check(all(s + mv <= a for s, mv, a in zip(ts["ais_stationary_on_posidonia"], ts["ais_moving_on_posidonia"],
+                                               ts["ais_matched_on_posidonia"])),
+           "timeseries ais_stationary_on_posidonia + ais_moving_on_posidonia <= ais_matched_on_posidonia")
     for iso, c in ts["by_country"].items():
         _check(len(iso) == 3 and "name" in c, f"by_country.{iso}")
         _check(len(c["anchored_on_posidonia"]) == n and len(c["large_on_posidonia"]) == n, f"by_country.{iso} lengths")
@@ -290,7 +293,7 @@ def validate_outputs(out_dir: Path) -> None:
     hm = json.loads((out_dir / "hexes_monthly.json").read_text())
     _check(hm["months"] == months, "hexes_monthly.months != meta.months")
     r = len(hm["cell"])
-    for k in ("month", "on_posidonia", "large_on_posidonia", *(key for _, _, key in AIS_COUNTS)):
+    for k in ("month", "on_posidonia", "large_on_posidonia", *(key for _, _, key in AIS_COUNTS if key)):
         _check(len(hm[k]) == r, f"hexes_monthly.{k} length")
     _check_ais_nesting(hm)
     _check(all(0 <= i < m for i in hm["cell"]), "hexes_monthly.cell index out of range")

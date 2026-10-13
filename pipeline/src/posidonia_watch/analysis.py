@@ -18,12 +18,13 @@ _SEASON_OF_MONTH = {12: "DJF", 1: "DJF", 2: "DJF", 3: "MAM", 4: "MAM", 5: "MAM",
 
 
 # The AIS counts, as (timeseries.json key, hex_monthly column, hexes_monthly.json key). A monthly total is the sum
-# of its hex_monthly column over the cells
+# of its hex_monthly column over the cells. Without a hexes_monthly.json key only the monthly total is published
 AIS_COUNTS = (
     ("ais_matched_on_posidonia", "ais", "ais_on_posidonia"),
     ("ais_matched_large_on_posidonia", "ais_large", "ais_large_on_posidonia"),
     ("ais_stationary_on_posidonia", "ais_st", "ais_stationary_on_posidonia"),
     ("ais_stationary_large_on_posidonia", "ais_st_large", "ais_stationary_large_on_posidonia"),
+    ("ais_moving_on_posidonia", "ais_mv", None),
 )
 
 
@@ -79,11 +80,12 @@ def _widened(col: pd.Series) -> np.ndarray:
 
 
 def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
-    """AIS view of each detection: matched, reported speed, confident, and AIS-confirmed stationary.
+    """AIS view of each detection: matched, reported speed, confident, and AIS-confirmed stationary or moving.
 
     ``ais_speed_kn`` is the mean of the speeds reported just before and after the image (NaN unless both
     exist). ``ais_confident`` is a match with ``matching_confidence >= ais_confidence_min``, and
-    ``ais_stationary`` a confident match whose speed is known and below ``speed_kn_max``.
+    ``ais_stationary`` a confident match whose speed is known and below ``speed_kn_max``. ``ais_moving`` is a
+    confident match whose speed is known and not below it; a confident match without a speed is neither.
     """
     mmsi = df["mmsi"]
     matched = (mmsi.notna() & (mmsi.astype(str).str.strip() != "")).to_numpy()
@@ -94,7 +96,8 @@ def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
         "ais_matched": matched,
         "ais_speed_kn": np.where(matched, speed, np.nan),
         "ais_confident": confident,
-        "ais_stationary": confident & (speed < params["speed_kn_max"]),  # NaN speed compares False
+        "ais_stationary": confident & (speed < params["speed_kn_max"]),  # NaN speed compares False, here and below
+        "ais_moving": confident & (speed >= params["speed_kn_max"]),
     }, index=df.index)
 
 
@@ -251,7 +254,7 @@ def hex_monthly(
     """Per (cell, month) values, so the web can aggregate any month selection.
 
     Returns sparse on-Posidonia counts (columns i, m, n, large, plus the AIS counts ais, ais_large, ais_st,
-    ais_st_large; ``i`` indexes ``hex_ids``, ``m`` indexes ``months``, only rows with n > 0) and a dense
+    ais_st_large, ais_mv; ``i`` indexes ``hex_ids``, ``m`` indexes ``months``, only rows with n > 0) and a dense
     ``len(hex_ids) x len(months)`` matrix of clear overpasses.
     """
     pos = pd.Series(np.arange(len(hex_ids)), index=pd.Index(hex_ids))
@@ -259,7 +262,7 @@ def hex_monthly(
     on = anch[anch["on_posidonia"] & anch["month"].isin(months) & anch["h3"].isin(pos.index)]
     on = on.assign(
         ais=on["ais_confident"], ais_large=on["ais_confident"] & on["large"],
-        ais_st=on["ais_stationary"], ais_st_large=on["ais_stationary"] & on["large"],
+        ais_st=on["ais_stationary"], ais_st_large=on["ais_stationary"] & on["large"], ais_mv=on["ais_moving"],
     )
     counts = ["large", *(col for _, col, _ in AIS_COUNTS)]
     rows = on.groupby(["h3", "month"]).agg(n=("large", "size"), **{c: (c, "sum") for c in counts}).reset_index()

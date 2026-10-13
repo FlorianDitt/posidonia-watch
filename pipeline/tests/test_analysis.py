@@ -83,7 +83,8 @@ def test_ais_fields_confirm_stationary_only_for_confident_matches_with_both_spee
     ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
     assert ais["ais_matched"].tolist() == [True, True, True, False, False, True]
     assert ais["ais_confident"].tolist() == [True, True, False, False, False, True]
-    assert ais["ais_stationary"].tolist() == [True, False, False, False, False, False]  # last: speed unknown
+    assert ais["ais_stationary"].tolist() == [True, False, False, False, False, False]  # last: speed unknown,
+    assert ais["ais_moving"].tolist() == [False, True, False, False, False, False]      # so neither of the two
     assert ais["ais_speed_kn"].iloc[1] == 6.5
     assert np.isnan(ais["ais_speed_kn"].iloc[3])  # no match: speed is not reported
 
@@ -107,6 +108,7 @@ def test_ais_fields_compare_float32_cache_values_at_their_decimal_value():
     ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
     assert ais["ais_confident"].tolist() == [True, True]
     assert ais["ais_stationary"].tolist() == [True, False]
+    assert ais["ais_moving"].tolist() == [False, True]
 
 
 def test_ais_fields_treat_columns_missing_from_old_caches_as_unmatched():
@@ -127,12 +129,12 @@ def test_hex_monthly_counts_ais_matches_per_cell_and_month():
     anch = pd.DataFrame({
         "on_posidonia": [True, True, True, False], "month": ["2025-07"] * 4, "h3": ["a", "a", "a", None],
         "large": [True, False, True, True], "ais_confident": [True, True, False, True],
-        "ais_stationary": [True, False, False, True],
+        "ais_stationary": [True, False, False, True], "ais_moving": [False, True, False, False],
     })
     ovp = pd.DataFrame({"h3_id": ["a"], "month": ["2025-07"], "overpasses_cloud_under_20": [3]})
     rows, clear = analysis.hex_monthly(anch, ["a"], ovp, ["2025-07"])
     r = rows.iloc[0]
-    assert (r.n, r.large, r.ais, r.ais_large, r.ais_st, r.ais_st_large) == (3, 2, 2, 1, 1, 1)
+    assert (r.n, r.large, r.ais, r.ais_large, r.ais_st, r.ais_st_large, r.ais_mv) == (3, 2, 2, 1, 1, 1, 1)
     assert clear.tolist() == [[3]]
 
 
@@ -140,7 +142,7 @@ def test_ais_monthly_totals_sum_the_hex_monthly_counts_over_the_cells():
     anch = pd.DataFrame({
         "on_posidonia": [True, True, True, True, False], "month": ["2025-07"] * 5, "h3": ["a", "a", "b", "b", None],
         "large": [True, False, True, False, True], "ais_confident": [True, True, False, True, True],
-        "ais_stationary": [True, False, False, True, True],
+        "ais_stationary": [True, False, False, True, True], "ais_moving": [False, False, False, False, False],
     })
     ovp = pd.DataFrame({"h3_id": ["a"], "month": ["2025-07"], "overpasses_cloud_under_20": [3]})
     months = ["2025-06", "2025-07"]
@@ -150,4 +152,5 @@ def test_ais_monthly_totals_sum_the_hex_monthly_counts_over_the_cells():
     t = totals.loc["2025-07"]
     assert (t.ais_matched_on_posidonia, t.ais_matched_large_on_posidonia) == (3, 1)
     assert (t.ais_stationary_on_posidonia, t.ais_stationary_large_on_posidonia) == (2, 1)
+    assert t.ais_moving_on_posidonia == 0  # the third confident match on Posidonia reports no speed
     assert totals.loc["2025-06"].sum() == 0
