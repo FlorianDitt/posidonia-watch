@@ -169,8 +169,9 @@ match, `1` a match below `params.ais_confidence_min`, `2` a confident match,
 values and matches the counts in `hexes_monthly.json`; consumers must use it
 instead of comparing the rounded `ais_conf` and `ais_speed_kn` with the
 thresholds.
-`ais_conf` is the AIS match confidence (2 decimals), `null` without a match or
-when GFW gives the match no confidence (such a match is class `1`).
+`ais_conf` is the AIS match confidence (2 decimals, rounded down so that a
+match below the threshold never shows the threshold), `null` without a match
+or when GFW gives the match no confidence (such a match is class `1`).
 `ais_speed_kn` (1 decimal) and `ais_length_m` (1 decimal) come from the
 matched vessel's AIS messages, `null` without a match or when AIS lacks them.
 `ais_flag` is the ISO 3166-1 alpha-2 flag state from the matched MMSI's first
