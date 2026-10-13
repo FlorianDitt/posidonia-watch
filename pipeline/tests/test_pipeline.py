@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from posidonia_watch import export, ingest, pipeline
 from posidonia_watch.config import Config
@@ -47,6 +48,16 @@ def test_is_cached_refetches_releases_cached_under_an_older_schema(tmp_path):
     legacy = {"202501": {"record_id": rel.record_id}}  # written before the schema was versioned
     assert pipeline.is_cached(cfg, rel, current)
     assert not pipeline.is_cached(cfg, rel, legacy)
+
+
+def test_build_input_refuses_releases_cached_under_an_older_schema(tmp_path):
+    cfg = Config(raw={}, base_dir=tmp_path)
+    for d in ("detections", "overpass"):
+        (cfg.cache_dir / d).mkdir(parents=True)
+        (cfg.cache_dir / d / "202501.parquet").touch()
+    pipeline.save_manifest(cfg, {"202501": {"record_id": 1}})
+    with pytest.raises(SystemExit, match="202501"):
+        pipeline._load_cached(cfg)
 
 
 def test_num_makes_values_json_safe():
