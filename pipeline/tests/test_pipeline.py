@@ -100,3 +100,14 @@ def test_points_obj_classifies_on_the_unrounded_values():
     pts = export.points_obj(anch, ["2025-07"], cap=10)
     assert pts["ais_speed_kn"] == [1.0, 0.1] and pts["ais_conf"] == [0.95, 0.9]  # rounded past the thresholds
     assert pts["ais_class"] == [3, 1]
+
+
+def test_ais_nesting_check_covers_the_large_counts():
+    row = {"on_posidonia": [5], "large_on_posidonia": [2], "ais_on_posidonia": [3], "ais_large_on_posidonia": [1],
+           "ais_stationary_on_posidonia": [2], "ais_stationary_large_on_posidonia": [1]}
+    export._check_ais_nesting(row)
+    for key, bad in (("ais_large_on_posidonia", 3),              # more large AIS matches than large boats
+                     ("ais_stationary_large_on_posidonia", 2),   # more than the large AIS matches
+                     ("large_on_posidonia", 6)):                 # more large boats than boats
+        with pytest.raises(export.ContractError):
+            export._check_ais_nesting({**row, key: [bad]})
