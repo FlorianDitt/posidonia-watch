@@ -122,7 +122,7 @@ function buildPointsGeojson(p: Points): GeoJSON.FeatureCollection {
   for (let i = 0; i < n; i++) {
     features[i] = {
       type: 'Feature',
-      // a: 1 for a confident AIS match; the AIS details stay off unmatched points to keep the source small
+      // a: 1 for a confident AIS match; speed, length and flag are only on those, to keep the source small
       properties: {
         m: p.month?.[i] ?? -1, L: p.length_m?.[i] ?? 0, c: p.country?.[i] ?? 'UNK',
         ...aisProps(p, i),
@@ -139,10 +139,12 @@ function aisProps(p: Points, i: number) {
   const cls = p.ais_class?.[i];
   if (cls == null) return {};
   if (cls === 0) return { a: 0 };
+  // an uncertain match (st is set for every match) only ever shows its confidence
+  if (cls < 2) return { a: 0, st: 0, ac: p.ais_conf?.[i] ?? null };
   // st: the boat's own AIS confirms it was anchored
   return {
-    a: cls >= 2 ? 1 : 0, st: cls === 3 ? 1 : 0,
-    ac: p.ais_conf?.[i] ?? null, as: p.ais_speed_kn?.[i] ?? null, al: p.ais_length_m?.[i] ?? null, af: p.ais_flag?.[i] ?? null,
+    a: 1, st: cls === 3 ? 1 : 0,
+    as: p.ais_speed_kn?.[i] ?? null, al: p.ais_length_m?.[i] ?? null, af: p.ais_flag?.[i] ?? null,
   };
 }
 
