@@ -50,14 +50,55 @@ def test_is_cached_refetches_releases_cached_under_an_older_schema(tmp_path):
     assert not pipeline.is_cached(cfg, rel, legacy)
 
 
+def _cache(cfg: Config, schemas: dict[str, int | None]) -> None:
+    """Cache one detection and one overpass row per period (first month of an annual one)."""
+    manifest = {}
+    for period, schema in schemas.items():
+        month = f"{period[:4]}-{period[4:] or '01'}"
+        for d, cols in (("detections", ingest.DETECTION_COLUMNS), ("overpass", ingest.OVERPASS_COLUMNS)):
+            (cfg.cache_dir / d).mkdir(parents=True, exist_ok=True)
+            pd.DataFrame({**{c: [None] for c in cols}, "month": [month]}).to_parquet(
+                cfg.cache_dir / d / f"{period}.parquet")
+        manifest[period] = {"record_id": 1} if schema is None else {"record_id": 1, "detections_schema": schema}
+    pipeline.save_manifest(cfg, manifest)
+
+
+CURRENT = ingest.DETECTION_SCHEMA_VERSION
+MONTHS_2025 = {f"2025{m:02d}": CURRENT for m in range(1, 13)}
+
+
 def test_build_input_refuses_releases_cached_under_an_older_schema(tmp_path):
     cfg = Config(raw={}, base_dir=tmp_path)
-    for d in ("detections", "overpass"):
-        (cfg.cache_dir / d).mkdir(parents=True)
-        (cfg.cache_dir / d / "202501.parquet").touch()
-    pipeline.save_manifest(cfg, {"202501": {"record_id": 1}})
+    _cache(cfg, {"202501": None})  # written before the schema was versioned
     with pytest.raises(SystemExit, match="202501"):
         pipeline._load_cached(cfg)
+
+
+def test_build_input_refuses_a_stale_annual_release_that_still_supplies_a_month(tmp_path):
+    cfg = Config(raw={}, base_dir=tmp_path)
+    _cache(cfg, {"2025": None, **{k: v for k, v in MONTHS_2025.items() if k != "202501"}})
+    with pytest.raises(SystemExit, match="2025"):
+        pipeline._load_cached(cfg)
+
+
+def test_build_input_skips_a_stale_annual_release_superseded_by_monthly_ones(tmp_path):
+    cfg = Config(raw={}, base_dir=tmp_path)
+    _cache(cfg, {"2025": None, **MONTHS_2025})
+    det, ovp, months, _ = pipeline._load_cached(cfg)
+    assert months == [f"2025-{m:02d}" for m in range(1, 13)]
+    assert len(det) == 12 and len(ovp) == 12
+
+
+def test_build_input_leaves_out_stale_releases_before_since(tmp_path):
+    cfg = Config(raw={}, base_dir=tmp_path)
+    _cache(cfg, {"2023": CURRENT, "2024": None, "202412": None, "202501": CURRENT})
+    with pytest.raises(SystemExit, match="2024, 202412"):
+        pipeline._load_cached(cfg)
+    _, _, months, _ = pipeline._load_cached(cfg, since="2025")
+    assert months == ["2023-01", "2025-01"]  # the current 2023 cache is still used
+    with pytest.raises(SystemExit, match="202501"):
+        _cache(cfg, {"202501": None})
+        pipeline._load_cached(cfg, since="2025")
 
 
 def test_num_makes_values_json_safe():

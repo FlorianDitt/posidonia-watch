@@ -26,7 +26,9 @@ def _parser() -> argparse.ArgumentParser:
                    help="months 'YYYY-MM' or whole years 'YYYY' (monthly releases preferred, else annual)")
     f.add_argument("--force", action="store_true", help="re-download even if cached")
 
-    sub.add_parser("build", help="aggregate everything cached -> web/public/data")
+    b = sub.add_parser("build", help="aggregate everything cached -> web/public/data")
+    b.add_argument("--since", default=None,
+                   help="leave out releases before this year (YYYY) that are cached under an older detection schema")
 
     u = sub.add_parser("update", help="fetch releases not cached yet (newest first), then build")
     u.add_argument("--max-releases", type=int, default=None, help="stop after fetching N releases")
@@ -70,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "build":
-        pipeline.build(cfg)
+        pipeline.build(cfg, since=args.since)
         return 0
 
     if args.cmd == "update":
@@ -99,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
             except Exception:
                 log.exception("Fetching %s failed; continuing with the others", rel.period)
         if not args.no_build:
-            pipeline.build(cfg)
+            pipeline.build(cfg, since=args.since)  # same view as the fetch: older stale releases are left out
         return 0
     return 1
 
