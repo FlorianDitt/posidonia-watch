@@ -197,11 +197,11 @@ def releases_for_months(releases: dict[str, zenodo.Release], months: list[str]) 
 # --------------------------------------------------------------------------- #
 # Build
 # --------------------------------------------------------------------------- #
-def _cached_periods(cfg: Config, since: str | None = None) -> tuple[list[str], set[str], set[str], set[str]]:
+def _cached_periods(cfg: Config, manifest: dict,
+                    since: str | None = None) -> tuple[list[str], set[str], set[str], set[str]]:
     """Cached periods to build from, the months with a monthly release among them, and the cached periods that
     are stale (cached under an older detection schema) and still needed, or stale and before ``since``."""
     p = _paths(cfg)
-    manifest = load_manifest(cfg)
     periods = sorted(k for k in manifest if (p["detections"] / f"{k}.parquet").exists()
                      and (p["overpass"] / f"{k}.parquet").exists())
     stale = {k for k in periods if manifest[k].get("detections_schema", 1) != ingest.DETECTION_SCHEMA_VERSION}
@@ -214,7 +214,7 @@ def _cached_periods(cfg: Config, since: str | None = None) -> tuple[list[str], s
 
 def stale_releases(cfg: Config, since: str | None = None) -> list[str]:
     """Cached releases that stop the build until they are fetched again (see ``_load_cached``)."""
-    return sorted(_cached_periods(cfg, since)[2])
+    return sorted(_cached_periods(cfg, load_manifest(cfg), since)[2])
 
 
 def _load_cached(cfg: Config, since: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame, list[str], dict]:
@@ -226,7 +226,7 @@ def _load_cached(cfg: Config, since: str | None = None) -> tuple[pd.DataFrame, p
     """
     p = _paths(cfg)
     manifest = load_manifest(cfg)
-    periods, monthly_months, stale, excluded = _cached_periods(cfg, since)
+    periods, monthly_months, stale, excluded = _cached_periods(cfg, manifest, since)
     if stale:  # their missing columns would read as "no AIS match" and publish zero AIS counts for those months
         raise SystemExit(f"Releases cached under an older detection schema: {', '.join(sorted(stale))}. "
                          "Run `posidonia-watch update --no-build` (or `fetch --months ...`) to fetch them again.")
