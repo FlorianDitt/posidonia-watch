@@ -21,6 +21,7 @@ const rand = prng(20261006);
 const aisRand = prng(8675309);
 const randn = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
 const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
+const floor = (v, d) => Math.floor(v * 10 ** d) / 10 ** d;
 
 const RES = 7;
 const months = [];
@@ -136,14 +137,15 @@ for (const [i, row] of rows.entries()) {
     points.country.push(row.country);
     // About half matched (larger boats more often); of confident matches ~60 % stationary, ~25 % at >= 5 kn
     const matched = aisRand() < (isLarge ? 0.7 : 0.35);
-    const conf = matched ? round(aisRand() < 0.55 ? 0.9 + aisRand() * 0.1 : aisRand() * 0.9, 2) : null;
+    const rawConf = matched ? (aisRand() < 0.55 ? 0.9 + aisRand() * 0.1 : aisRand() * 0.9) : null;
     const u = aisRand();
     const speed = matched ? round(u < 0.6 ? aisRand() * 0.6 : u < 0.75 ? 1 + aisRand() * 4 : 5 + aisRand() * 6, 1) : null;
     const aisLen = matched ? round(len * (0.85 + aisRand() * 0.3), 1) : null;
     const flag = matched ? (aisRand() < 0.7 ? LOCAL_FLAG[row.country] ?? 'MT' : OTHER_FLAGS[Math.floor(aisRand() * OTHER_FLAGS.length)]) : null;
-    const confident = conf !== null && conf >= AIS_CONF_MIN;
-    // Like the pipeline: an uncertain match publishes its confidence only
-    points.ais_conf.push(conf);
+    // Like the pipeline: classed on the unrounded confidence, which is published rounded down, and an uncertain
+    // match publishes its confidence only
+    const confident = rawConf !== null && rawConf >= AIS_CONF_MIN;
+    points.ais_conf.push(rawConf === null ? null : floor(rawConf, 2));
     points.ais_speed_kn.push(confident ? speed : null);
     points.ais_length_m.push(confident ? aisLen : null);
     points.ais_flag.push(confident ? flag : null);
