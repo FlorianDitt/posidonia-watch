@@ -76,7 +76,10 @@ export interface Points {
   month: number[];
   length_m: number[];
   country: string[];
-  /** AIS match confidence, null without a match. The AIS fields are missing in data built before they existed. */
+  /** 0 no AIS match, 1 uncertain match, 2 confident match, 3 confident and AIS-stationary. The AIS fields are
+   *  missing in data built before they existed. */
+  ais_class?: number[];
+  /** AIS match confidence (rounded, for display), null without a match. */
   ais_conf?: (number | null)[];
   ais_speed_kn?: (number | null)[];
   ais_length_m?: (number | null)[];
