@@ -365,7 +365,7 @@ function hexPopupHtml(i: number): string {
     <div class="font-medium text-ink-2">${escapeHtml(countryName(h.country?.[i]))}</div>
     <div class="text-muted">${escapeHtml(periodLabel())}</div>
     <div class="mt-2 text-2xl font-semibold leading-none tabular">${fmtInt(a.on_posidonia[i])}</div>
-    <div class="mb-3 mt-1 text-ink-2">${boatsWord()} on seagrass</div>
+    <div class="mb-3 mt-1 text-ink-2">${boatsWord()}${state.boats === 'ais_st' ? '' : ' anchored'} on seagrass</div>
     <table class="w-full">
       ${row(`≥ ${largeLen} m`, fmtInt(a.large_on_posidonia[i]))}
       ${row('Per clear image', Number.isFinite(d) ? fmtNum(d, 2) : 'n/a')}
