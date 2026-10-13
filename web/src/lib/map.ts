@@ -95,9 +95,6 @@ let posidoniaGeojson: GeoJSON.FeatureCollection | null = null;
 let pointsLoading = false;
 let posidoniaLoading = false;
 let largeLen = 24;
-/** GFW matching_confidence from which an AIS match counts (meta.params.ais_confidence_min). */
-let aisMin = 0.9;
-let speedMax = 1;
 
 function setStatus(msg: string | null) {
   const el = $('map-status');
@@ -134,13 +131,17 @@ function buildPointsGeojson(p: Points): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
 }
 
+/** AIS properties of point i, from the pipeline's class (the published confidence and speed are rounded, so they
+ *  are only shown, never compared). No properties at all when the data has no AIS class: the match is unknown. */
 function aisProps(p: Points, i: number) {
-  const conf = p.ais_conf?.[i];
-  if (conf == null) return { a: 0 };
-  const speed = p.ais_speed_kn?.[i] ?? null;
-  const a = conf >= aisMin ? 1 : 0;
-  // st: the boat's own AIS confirms it was anchored (same rule as the pipeline's AIS-stationary)
-  return { a, st: a && speed !== null && speed < speedMax ? 1 : 0, ac: conf, as: speed, al: p.ais_length_m?.[i] ?? null, af: p.ais_flag?.[i] ?? null };
+  const cls = p.ais_class?.[i];
+  if (cls == null) return {};
+  if (cls === 0) return { a: 0 };
+  // st: the boat's own AIS confirms it was anchored
+  return {
+    a: cls >= 2 ? 1 : 0, st: cls === 3 ? 1 : 0,
+    ac: p.ais_conf?.[i] ?? null, as: p.ais_speed_kn?.[i] ?? null, al: p.ais_length_m?.[i] ?? null, af: p.ais_flag?.[i] ?? null,
+  };
 }
 
 /** Quantile class breaks over positive, finite values. Returns ascending unique thresholds (<= 4). */
@@ -393,7 +394,7 @@ function hexPopupHtml(i: number): string {
 }
 
 function pointPopupHtml(f: MapGeoJSONFeature): string {
-  const p = f.properties as { m: number; L: number; c: string; a: number; ac?: number; as?: number | null; al?: number | null; af?: string | null };
+  const p = f.properties as { m: number; L: number; c: string } & AisProps;
   const month = meta?.months?.[p.m];
   const large = p.L >= largeLen;
   return `<div class="text-xs"><div class="font-semibold">${escapeHtml(fmtMonth(month ?? '?'))}</div>
@@ -401,14 +402,16 @@ function pointPopupHtml(f: MapGeoJSONFeature): string {
     <div class="text-muted">${escapeHtml(countryName(p.c))}</div>${aisPopupHtml(p)}</div>`;
 }
 
+type AisProps = { a?: number; st?: number; ac?: number | null; as?: number | null; al?: number | null; af?: string | null };
+
 /** AIS block of the boat popup. Only confident matches name a flag, so an uncertain match never pins a country on a boat. */
-function aisPopupHtml(p: { a: number; ac?: number; as?: number | null; al?: number | null; af?: string | null }): string {
+function aisPopupHtml(p: AisProps): string {
+  if (p.a == null) return ''; // data without AIS: unknown, which is not "no match"
   if (p.ac == null) return '<div class="mt-1 border-t border-line pt-1 text-muted">No AIS match</div>';
   if (!p.a) return `<div class="mt-1 border-t border-line pt-1 text-muted">Uncertain AIS match (confidence ${fmtNum(p.ac, 2)})</div>`;
-  const maxKn = meta?.params?.speed_kn_max ?? 1;
   const flag = p.af ? `<div><span class="text-base leading-none">${flagEmoji(p.af)}</span> ${escapeHtml(flagName(p.af))} flag</div>` : '';
   const facts = [p.al != null ? `${fmtNum(p.al, 1)} m` : null, p.as != null ? `${fmtNum(p.as, 1)} kn` : null].filter(Boolean).join(' · ');
-  const moving = p.as != null && p.as >= maxKn
+  const moving = p.as != null && !p.st
     ? `<div class="font-semibold" style="color:var(--point-large)">AIS reports it moving</div>` : '';
   return `<div class="mt-1 border-t border-line pt-1"><div class="font-medium text-ink-2">AIS match</div>${flag}
     ${facts ? `<div class="text-muted">${facts} reported</div>` : ''}${moving}</div>`;
@@ -425,8 +428,6 @@ export async function initMap() {
   meta = m;
   if (ts?.by_country) setCountryNames(Object.fromEntries(Object.entries(ts.by_country).map(([k, v]) => [k, v.name])));
   largeLen = meta?.params?.large_length_m ?? 24;
-  aisMin = meta?.params?.ais_confidence_min ?? 0.9;
-  speedMax = meta?.params?.speed_kn_max ?? 1;
   calendar = buildCalendar(meta?.months ?? []);
   if (hx && Array.isArray(hx.h3) && hx.h3.length > 0) {
     hexes = hx;
