@@ -333,8 +333,8 @@ function dotPaint() {
   return {
     'circle-color': fillColorExpr(),
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, ['case', positive, 3, 1.5], DOTS_MAXZOOM, ['case', positive, 6, 3]],
-    'circle-stroke-color': cssVar('--hex-line'),
-    'circle-stroke-width': 0.75,
+    'circle-stroke-color': cssVar('--map-halo'),
+    'circle-stroke-width': 1,
     'circle-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
     'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
   } as unknown as NonNullable<maplibregl.CircleLayerSpecification['paint']>;
