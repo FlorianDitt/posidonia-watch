@@ -104,7 +104,8 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
               </div>
             </fieldset>
             <p id="boats-note" class="text-xs leading-relaxed text-muted">
-              Counts, hexagons and single boats follow this choice. Boats with an AIS match have a dark ring{' '}
+              Hexagons, month bars and single boats follow this choice; the Hotspots list always counts all boats.
+              Boats with an AIS match have a dark ring{' '}
               <span class="inline-block h-2.5 w-2.5 rounded-full border-2 border-ink bg-surface align-middle"></span>.{' '}
               <a class="underline" href={withBase('about/#ais')}>What AIS shows</a>
             </p>
@@ -139,7 +140,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
       </section>
 
       <section id="pane-hotspots" role="tabpanel" aria-labelledby="tab-hotspots" hidden class="p-2">
-        <p class="px-2 pb-2 pt-1 text-xs text-muted">Cells with the most boats anchored on Posidonia (all months). Select one to fly there.</p>
+        <p class="px-2 pb-2 pt-1 text-xs text-muted">Cells with the most boats anchored on Posidonia (all months, all boats). Select one to fly there.</p>
         <ol id="hotspot-list" class="space-y-0.5"></ol>
       </section>
     </div>
