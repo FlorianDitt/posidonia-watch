@@ -450,7 +450,7 @@ export async function initMap() {
       container: 'map',
       style: await basemapStyle(),
       bounds: [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
-      fitBoundsOptions: { padding: window.innerWidth >= 640 ? { top: 20, bottom: 20, left: 340, right: 20 } : { top: 10, bottom: 60, left: 10, right: 10 } },
+      fitBoundsOptions: { padding: window.innerWidth >= 640 ? { top: 20, bottom: 20, left: 370, right: 20 } : { top: 10, bottom: 60, left: 10, right: 10 } },
       attributionControl: false,
       maxZoom: 16,
       dragRotate: false,

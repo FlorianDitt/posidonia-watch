@@ -22,12 +22,12 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     id="panel"
     data-open="false"
     aria-label="Map controls and hotspots"
-    class="panel absolute z-20 flex flex-col overflow-hidden border border-line bg-surface text-sm shadow-lg
+    class="panel absolute z-20 flex flex-col overflow-hidden border border-line bg-surface text-sm shadow-[0_10px_30px_rgb(0_0_0/0.35)]
       max-sm:inset-x-0 max-sm:bottom-0 max-sm:rounded-t-2xl max-sm:border-b-0
-      sm:left-3 sm:top-3 sm:max-h-[calc(100%-1.5rem)] sm:w-80 sm:rounded-xl"
+      sm:bottom-4 sm:left-4 sm:max-h-[calc(100%-2rem)] sm:w-[21rem] sm:rounded-2xl"
   >
-    <div class="flex items-center gap-1 border-b border-line px-2 py-2">
-      <div role="tablist" aria-label="Panel" class="flex flex-1 gap-1">
+    <div class="flex items-center gap-2 px-3 pb-1 pt-3">
+      <div role="tablist" aria-label="Panel" class="tabs">
         <button role="tab" id="tab-layers" aria-controls="pane-layers" aria-selected="true" class="tab">Layers</button>
         <button role="tab" id="tab-hotspots" aria-controls="pane-hotspots" aria-selected="false" class="tab">Hotspots</button>
       </div>
@@ -36,8 +36,8 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
       </button>
     </div>
 
-    <div id="panel-body" class="panel-body min-h-0 flex-1 overflow-y-auto bg-bg">
-      <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="space-y-2 p-2.5">
+    <div id="panel-body" class="panel-body min-h-0 flex-1 overflow-y-auto">
+      <section id="pane-layers" role="tabpanel" aria-labelledby="tab-layers" class="space-y-2 p-3">
         <details class="sec" open>
           <summary><span class="sec-title">Legend</span><span id="sum-metric" class="sec-value">Boats</span><span class="chev" aria-hidden="true">▾</span></summary>
           <div class="sec-body space-y-4">
@@ -106,7 +106,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
             <p id="boats-note" class="text-xs leading-relaxed text-muted">
               Hexagons, month bars and single boats follow this choice; the Hotspots list always counts all boats.
               Boats with a confident AIS match have a dark ring{' '}
-              <span class="inline-block h-2.5 w-2.5 rounded-full border-2 border-ink bg-surface align-middle"></span>.{' '}
+              <span class="inline-block h-2.5 w-2.5 rounded-full border-2 align-middle" style="background:var(--map-halo);border-color:var(--map-ink);box-shadow:0 0 0 1.5px var(--map-halo)"></span>.{' '}
               <a class="underline" href={withBase('about/#ais')}>What AIS shows</a>
             </p>
             <p id="boats-points-note" hidden role="status" class="text-xs leading-relaxed text-ink-2">
@@ -122,20 +122,20 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
             <label class="flex items-center gap-2"><input type="checkbox" id="toggle-hexes" checked class="accent-[var(--sea)]" />
               <span class="inline-block h-3 w-4 rounded-sm" style="background:linear-gradient(to right, var(--ramp-0), var(--ramp-4))"></span>
               <span>Anchoring pressure <span class="text-xs text-muted">(hexagons)</span></span></label>
-            <label class="flex items-center gap-2"><input type="checkbox" id="toggle-posidonia" checked class="accent-[var(--seagrass)]" />
-              <span class="inline-block h-3 w-4 rounded-sm border border-seagrass bg-seagrass/30"></span>
+            <label class="flex items-center gap-2"><input type="checkbox" id="toggle-posidonia" checked class="accent-[var(--map-seagrass)]" />
+              <span class="inline-block h-3 w-4 rounded-sm border" style="border-color:var(--map-seagrass);background:color-mix(in srgb, var(--map-seagrass) 60%, white)"></span>
               <span>Seagrass meadows</span></label>
             <label class="flex items-center gap-2"><input type="checkbox" id="toggle-small" checked class="accent-[var(--point-small)]" />
-              <span class="inline-flex w-4 justify-center"><span class="inline-block h-2 w-2 rounded-full" style="background:var(--point-small)"></span></span>
+              <span class="inline-flex w-4 justify-center"><span class="inline-block h-2 w-2 rounded-full" style="background:var(--point-small);box-shadow:0 0 0 1px var(--map-halo)"></span></span>
               <span>Boats <span class="text-xs text-muted">(&lt; {large} m)</span></span></label>
             <label class="flex items-center gap-2"><input type="checkbox" id="toggle-large" checked class="accent-[var(--point-large)]" />
-              <span class="inline-flex w-4 justify-center"><span class="inline-block h-3 w-3 rounded-full" style="background:var(--point-large)"></span></span>
+              <span class="inline-flex w-4 justify-center"><span class="inline-block h-3 w-3 rounded-full" style="background:var(--point-large);box-shadow:0 0 0 1px var(--map-halo)"></span></span>
               <span>Large boats <span class="text-xs text-muted">(≥ {large} m)</span></span></label>
             <p class="text-xs text-muted">Zoom in to see meadows and single boats.</p>
           </fieldset>
         </details>
 
-        <p class="px-1.5 pt-1 text-xs leading-relaxed text-muted">
+        <p class="px-1 pt-2 text-xs leading-relaxed text-muted">
           Shows anchoring pressure, not proven violations.{' '}
           <a class="text-sea underline" href={withBase('about/')}>How this works</a>
           <span class="mt-1 block tabular">Updated {meta ? fmtDate(meta.generated_at) : '–'}</span>
@@ -151,27 +151,38 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
 </Base>
 
 <style>
+  /* Selected tab and segment: a light pill on a dark track */
+  .tabs {
+    display: grid;
+    flex: 1;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+  }
   .tab {
-    border-radius: 0.375rem;
-    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    padding: 0.45rem 0.75rem;
     color: var(--ink-2);
+    font-size: 0.9375rem;
     font-weight: 500;
+    transition: background-color 0.1s, color 0.1s;
   }
   .tab[aria-selected='true'] {
-    background: var(--seagrass-soft);
-    color: var(--ink);
+    background: var(--ink);
+    color: var(--surface);
   }
-  .tab:hover { color: var(--ink); }
+  .tab:hover:not([aria-selected='true']) { color: var(--ink); }
   .segs {
     display: grid;
     gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    background: var(--surface-2);
+    padding: 3px;
+    border-radius: 9999px;
+    background: var(--bg);
   }
   .seg {
-    border-radius: 0.375rem;
+    border-radius: 9999px;
     padding: 0.3rem 0;
     font-size: 0.75rem;
     font-weight: 500;
@@ -180,7 +191,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   }
   .seg:hover:not(:disabled) { color: var(--ink); }
   .seg[aria-pressed='true'] {
-    background: var(--sea);
+    background: var(--ink);
     color: var(--surface);
   }
   .seg:disabled { opacity: 0.45; }
@@ -194,7 +205,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   }
   .seg-radio:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
   .seg-radio:has(input:checked) {
-    background: var(--sea);
+    background: var(--ink);
     color: var(--surface);
   }
   .seg-radio:has(input:focus-visible) {
@@ -208,12 +219,12 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     align-items: center;
     gap: 0.5rem;
     border: 1px solid var(--line);
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     padding: 0.4rem 0.625rem;
     font-size: 0.8125rem;
     font-weight: 500;
     color: var(--ink);
-    background: var(--surface);
+    background: var(--bg);
     text-align: left;
   }
   .dd-btn:hover:not(:disabled) { border-color: var(--muted); }
@@ -243,7 +254,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     font-variant-numeric: tabular-nums;
   }
   .dd-list li.dd-active { background: var(--surface-2); color: var(--ink); }
-  .dd-list li[aria-selected='true'] { background: var(--sea); color: var(--surface); font-weight: 500; }
+  .dd-list li[aria-selected='true'] { background: var(--ink); color: var(--surface); font-weight: 500; }
   /* Timeline bars are rendered by src/lib/timeline.ts, hence :global() */
   .timeline { --tl-win-bg: color-mix(in srgb, var(--sea) 12%, var(--surface)); }
   .timeline :global(.tl-scroll) {
@@ -347,17 +358,15 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .timeline :global(.tl-handle[data-h='1']) { right: -0.4375rem; }
   .timeline :global(.tl-plot) { padding-bottom: 1.25rem; }
   .sec {
-    border: 1px solid var(--line);
-    border-radius: 0.75rem;
-    padding: 0 0.875rem;
-    background: var(--surface);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+    border-radius: 0.875rem;
+    padding: 0 1rem;
+    background: var(--surface-2);
   }
   .sec summary {
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
-    padding: 0.75rem 0;
+    padding: 0.875rem 0;
     cursor: pointer;
     list-style: none;
   }
@@ -365,7 +374,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .sec summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 0.25rem; }
   .sec-title { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
   .sec summary:hover .sec-title { color: var(--ink); }
-  .sec-value { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 0.8125rem; color: var(--ink); }
+  .sec-value { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-size: 0.875rem; color: var(--ink); }
   .sec-body { padding-bottom: 0.875rem; }
   .sub { margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--muted); }
   .chev { font-size: 0.7rem; color: var(--muted); transition: transform 0.15s; }
