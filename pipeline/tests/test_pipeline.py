@@ -76,7 +76,7 @@ def test_points_obj_publishes_ais_values_only_for_matches_and_never_the_mmsi():
         "detect_timestamp": ["2025-07-02", "2025-07-01"], "lon": [3.0, 3.1], "lat": [42.0, 42.1],
         "length_m_inferred": [30.0, 12.0], "country": ["FRA", "FRA"], "mmsi": ["227000000", None],
         "ais_matched": [True, False], "matching_confidence": [0.971, 0.4],
-        "ais_speed_kn": [0.24, np.nan], "ais_length_m": [33.0, 15.0], "ais_flag": ["FR", None],
+        "ais_speed_kn": [0.24, np.nan], "ais_length_m": [33.0, 15.0],
     })
     pts = export.points_obj(anch, ["2025-07"], cap=10)
     assert "mmsi" not in pts

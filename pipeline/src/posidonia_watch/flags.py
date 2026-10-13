@@ -55,5 +55,6 @@ def flag_of(mmsi: pd.Series) -> np.ndarray:
     """ISO2 flag per MMSI, or None (no MMSI, not a 9-digit ship MMSI, unknown MID)."""
     s = mmsi.astype("string").str.strip()
     ship = s.str.fullmatch(r"[2-7]\d{8}").fillna(False).to_numpy(dtype=bool)
-    mid = s.str.slice(0, 3).to_numpy(dtype=object)
-    return np.array([MID_TO_ISO2.get(m) if ok else None for m, ok in zip(mid, ship)], dtype=object)
+    flag = s.str.slice(0, 3).astype(object).map(MID_TO_ISO2).to_numpy(dtype=object)
+    flag[~ship | pd.isna(flag)] = None
+    return flag

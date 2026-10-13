@@ -85,7 +85,6 @@ def test_ais_fields_confirm_stationary_only_for_confident_matches_with_both_spee
     assert ais["ais_confident"].tolist() == [True, True, False, False, False, True]
     assert ais["ais_stationary"].tolist() == [True, False, False, False, False, False]  # last: speed unknown
     assert ais["ais_speed_kn"].iloc[1] == 6.5
-    assert ais["ais_flag"].tolist() == ["FR", "IT", None, None, None, None]  # short MMSI, no-flag MID 306
     assert np.isnan(ais["ais_speed_kn"].iloc[3])  # no match: speed is not reported
 
 
@@ -110,8 +109,9 @@ def test_ais_fields_treat_columns_missing_from_old_caches_as_unmatched():
 
 def test_flag_of_reads_the_mid_of_nine_digit_ship_mmsis_only():
     from posidonia_watch.flags import flag_of
-    got = flag_of(pd.Series(["247123456", " 227123456", "970123456", "24712345", None]))
-    assert got.tolist() == ["IT", "FR", None, None, None]  # 970: SART beacon, not a ship
+    got = flag_of(pd.Series(["247123456", " 227123456", "970123456", "24712345", None, "", "306000006"]))
+    # 970: SART beacon, not a ship; 306: no single flag
+    assert got.tolist() == ["IT", "FR", None, None, None, None, None]
 
 
 def test_hex_monthly_counts_ais_matches_per_cell_and_month():

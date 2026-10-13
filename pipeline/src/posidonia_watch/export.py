@@ -15,6 +15,7 @@ import pandas as pd
 import shapely
 
 from .analysis import SEASONS
+from .flags import flag_of
 from .habitat import MED_LAEA
 
 log = logging.getLogger(__name__)
@@ -133,7 +134,7 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
         "ais_conf": ais("matching_confidence", 2),
         "ais_speed_kn": ais("ais_speed_kn", 1),
         "ais_length_m": ais("ais_length_m", 1),
-        "ais_flag": [f if m and isinstance(f, str) else None for f, m in zip(on["ais_flag"], matched)],
+        "ais_flag": flag_of(on["mmsi"]).tolist(),
     }
 
 
