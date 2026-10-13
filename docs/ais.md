@@ -90,8 +90,8 @@ images), vessel names, IMO numbers, exact AIS timestamps or AIS positions.
 **Published per detection** (`points.json`):
 
 - whether there is a match, and its confidence (rounded down to 2 decimals);
-- for a confident match, the AIS-reported speed (mean of before/after) and
-  length;
+- for a confident match, the AIS-reported speed (mean of before/after,
+  rounded down to 1 decimal) and length;
 - for a confident match, the flag state: the country of registration, from
   the first three digits of the MMSI (its Maritime Identification Digits,
   assigned by the ITU).

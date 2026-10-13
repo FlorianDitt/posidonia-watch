@@ -157,8 +157,8 @@ def test_points_obj_classifies_on_the_unrounded_values():
         "ais_speed_kn": [0.96, 0.1], "ais_length_m": [33.0, 15.0],
     })
     pts = export.points_obj(anch, ["2025-07"], cap=10)
-    assert pts["ais_speed_kn"] == [1.0, None]  # rounded past the threshold
-    assert pts["ais_conf"] == [0.95, 0.89]  # rounded down: stays below the threshold
+    assert pts["ais_speed_kn"] == [0.9, None]  # rounded down: an AIS-stationary boat stays below the threshold
+    assert pts["ais_conf"] == [0.95, 0.89]  # likewise
     assert pts["ais_class"] == [3, 1]
 
 

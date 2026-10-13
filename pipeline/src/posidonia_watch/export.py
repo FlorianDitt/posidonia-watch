@@ -151,8 +151,9 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
         # 0 no match, 1 uncertain match, 2 confident, 3 confident and AIS-stationary
         "ais_class": (matched.astype(int) + confident.astype(int)
                       + on["ais_stationary"].to_numpy(dtype=int)).tolist(),
-        "ais_conf": ais("matching_confidence", 2, matched, _floor),  # 0.896 is uncertain and must not read as 0.9
-        "ais_speed_kn": ais("ais_speed_kn", 1),
+        # Rounded down: 0.896 is uncertain and must not read as 0.9, nor an AIS-stationary 0.96 kn as 1.0 kn
+        "ais_conf": ais("matching_confidence", 2, matched, _floor),
+        "ais_speed_kn": ais("ais_speed_kn", 1, num=_floor),
         "ais_length_m": ais("ais_length_m", 1),
         "ais_flag": [f if k else None for f, k in zip(flag_of(on["mmsi"]), confident)],
     }
