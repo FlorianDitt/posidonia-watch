@@ -83,6 +83,14 @@ def _widened(col: pd.Series) -> np.ndarray:
     return np.round(pd.to_numeric(col, errors="coerce").to_numpy(dtype=float), WIDENING_DECIMALS)
 
 
+def ais_matched(df: pd.DataFrame) -> np.ndarray:
+    """Boolean: has the detection an AIS match (an MMSI)? False for caches without the AIS columns."""
+    if "mmsi" not in df:
+        return np.zeros(len(df), dtype=bool)
+    mmsi = df["mmsi"]
+    return (mmsi.notna() & (mmsi.astype(str).str.strip() != "")).to_numpy()
+
+
 def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     """AIS view of each detection: matched, reported speed, confident, and AIS-confirmed stationary or moving.
 
@@ -91,8 +99,7 @@ def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     ``ais_stationary`` a confident match whose speed is known and below ``speed_kn_max``. ``ais_moving`` is a
     confident match whose speed is known and not below it; a confident match without a speed is neither.
     """
-    mmsi = df["mmsi"]
-    matched = (mmsi.notna() & (mmsi.astype(str).str.strip() != "")).to_numpy()
+    matched = ais_matched(df)
     conf = _widened(df["matching_confidence"])
     speed = (_widened(df["ais_speed_kn_before"]) + _widened(df["ais_speed_kn_after"])) / 2
     confident = matched & (conf >= params["ais_confidence_min"])
@@ -115,15 +122,11 @@ def dedupe(df: pd.DataFrame) -> pd.DataFrame:
         df["lat"].round(4).astype(str) + "," + df["lon"].round(4).astype(str) + ","
         + df["detect_timestamp"].astype(str).str.slice(0, 16)
     ).to_numpy()
-    n = len(df)
-    matched = np.zeros(n, dtype=bool)
-    if "mmsi" in df:
-        matched = (df["mmsi"].notna() & (df["mmsi"].astype(str).str.strip() != "")).to_numpy()
-    conf = (_widened(df["matching_confidence"]) if "matching_confidence" in df else np.zeros(n))
-    order = np.lexsort((-np.nan_to_num(conf, nan=-1.0), ~matched))  # stable: matched, then most confident first
-    keep = np.zeros(n, dtype=bool)
-    keep[order[~pd.Series(key[order]).duplicated().to_numpy()]] = True
-    return df[keep]
+    conf = _widened(df["matching_confidence"]) if "matching_confidence" in df else np.nan
+    rank = pd.DataFrame({"key": key, "matched": ais_matched(df), "conf": conf})
+    first = (rank.sort_values(["matched", "conf"], ascending=False, kind="stable", na_position="last")
+             .drop_duplicates("key").index)
+    return df.iloc[np.sort(first)]
 
 
 def points_within(lon, lat, polygons_metric: gpd.GeoDataFrame) -> np.ndarray:
