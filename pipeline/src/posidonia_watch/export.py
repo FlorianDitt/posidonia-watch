@@ -24,6 +24,9 @@ FILES = ("meta.json", "timeseries.json", "hexes.json", "hexes_monthly.json", "po
          "hotspots.json")
 
 
+AIS_LENGTH_STEP_M = 5
+
+
 def _num(x, nd: int | None = None):
     """JSON-safe number: NaN -> None, numpy -> python, optional rounding."""
     if x is None:
@@ -45,6 +48,12 @@ def _floor(x, nd: int):
     """
     x = _num(x)
     return None if x is None else math.floor(round(x * 10 ** nd, WIDENING_DECIMALS - nd)) / 10 ** nd
+
+
+def _step(x, step: float):
+    """Like ``_num``, rounded to the nearest multiple of ``step``."""
+    x = _num(x)
+    return None if x is None else int(round(x / step) * step)
 
 
 def write_json(path: Path, obj) -> None:
@@ -144,7 +153,8 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
         # Rounded down: 0.896 is uncertain and must not read as 0.9, nor an AIS-stationary 0.96 kn as 1.0 kn
         "ais_conf": ais("matching_confidence", 2, matched, _floor),
         "ais_speed_kn": ais("ais_speed_kn", 1, num=_floor),
-        "ais_length_m": ais("ais_length_m", 1),
+        # In 5 m steps: the exact AIS length plus the flag can name a large yacht (docs/ais.md)
+        "ais_length_m": ais("ais_length_m", AIS_LENGTH_STEP_M, num=_step),
         "ais_flag": [f if k else None for f, k in zip(flag_of(on["mmsi"]), confident)],
     }
 
@@ -244,6 +254,8 @@ def _check_points_ais(pts: dict) -> None:
            "points.ais_conf must be null without a match")
     _check(all(v is not None for c, v in zip(pts["ais_class"], pts["ais_conf"]) if c >= 2),
            "points.ais_conf must be set for a confident match")
+    _check(all(v is None or v % AIS_LENGTH_STEP_M == 0 for v in pts["ais_length_m"]),
+           f"points.ais_length_m must be a multiple of {AIS_LENGTH_STEP_M}")
     for k in ("ais_speed_kn", "ais_length_m", "ais_flag"):
         _check(all(v is None for c, v in zip(pts["ais_class"], pts[k]) if c < 2),
                f"points.{k} must be null without a confident match")

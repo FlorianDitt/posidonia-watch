@@ -147,7 +147,7 @@ for (const [i, row] of rows.entries()) {
     const confident = rawConf !== null && rawConf >= AIS_CONF_MIN;
     points.ais_conf.push(rawConf === null ? null : floor(rawConf, 2));
     points.ais_speed_kn.push(confident ? speed : null);
-    points.ais_length_m.push(confident ? aisLen : null);
+    points.ais_length_m.push(confident ? Math.round(aisLen / 5) * 5 : null);
     points.ais_flag.push(confident ? flag : null);
     const cm = cellMonth[mi];
     cm[0]++;

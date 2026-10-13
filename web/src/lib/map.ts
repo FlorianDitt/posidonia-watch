@@ -398,7 +398,7 @@ function aisPopupHtml(p: AisProps): string {
   if (p.st == null) return '<div class="mt-1 border-t border-line pt-1 text-muted">No AIS match</div>'; // st is set for matches only
   if (!p.a) return `<div class="mt-1 border-t border-line pt-1 text-muted">Uncertain AIS match${p.ac != null ? ` (confidence ${uncertainConf(p.ac)})` : ''}</div>`;
   const flag = p.af ? `<div><span class="text-base leading-none">${flagEmoji(p.af)}</span> ${escapeHtml(flagName(p.af))} flag</div>` : '';
-  const facts = [p.al != null ? `${fmtNum(p.al, 1)} m` : null, p.as != null ? `${fmtNum(p.as, 1)} kn` : null].filter(Boolean).join(' · ');
+  const facts = [p.al != null ? `≈ ${fmtNum(p.al, 0)} m` : null, p.as != null ? `${fmtNum(p.as, 1)} kn` : null].filter(Boolean).join(' · ');
   const moving = p.as != null && !p.st
     ? `<div class="font-semibold" style="color:var(--point-large)">AIS reports it moving</div>` : '';
   return `<div class="mt-1 border-t border-line pt-1"><div class="font-medium text-ink-2">AIS match</div>${flag}

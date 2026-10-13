@@ -153,6 +153,11 @@ def test_num_makes_values_json_safe():
     assert not math.isnan(export._num(np.float32(1.5)))
 
 
+def test_step_rounds_the_ais_length_to_5_m():
+    assert [export._step(v, 5) for v in (54.3, 52.4, 2.0, np.float32(33.0))] == [55, 50, 0, 35]
+    assert export._step(float("nan"), 5) is None
+
+
 def test_floor_rounds_down_but_not_below_the_float32_value():
     assert export._floor(0.896, 2) == 0.89
     assert export._floor(0.899999, 2) == 0.89
@@ -176,7 +181,7 @@ def test_points_obj_publishes_ais_values_only_for_matches_and_never_the_mmsi():
     assert pts["ais_class"] == [3, 0]
     assert pts["ais_conf"] == [0.97, None]
     assert pts["ais_speed_kn"] == [0.2, None]
-    assert pts["ais_length_m"] == [33.0, None]
+    assert pts["ais_length_m"] == [35, None]  # in 5 m steps
     assert pts["ais_flag"] == ["FR", None]
 
 

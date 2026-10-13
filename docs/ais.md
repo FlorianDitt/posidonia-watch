@@ -91,7 +91,7 @@ images), vessel names, IMO numbers, exact AIS timestamps or AIS positions.
 
 - whether there is a match, and its confidence (rounded down to 2 decimals);
 - for a confident match, the AIS-reported speed (mean of before/after,
-  rounded down to 1 decimal) and length;
+  rounded down to 1 decimal) and length, rounded to the nearest 5 m;
 - for a confident match, the flag state: the country of registration, from
   the first three digits of the MMSI (its Maritime Identification Digits,
   assigned by the ITU).
@@ -99,7 +99,9 @@ images), vessel names, IMO numbers, exact AIS timestamps or AIS positions.
 
 The detection's position and month are already public. None of the added
 fields identifies a vessel on its own: a flag is shared by thousands of
-boats, and the MMSI it comes from is not published.
+boats, and the MMSI it comes from is not published. Together they could: the
+exact AIS length (a static value, to 0.1 m) plus the flag is close to unique
+among large yachts, so the length is published only in 5 m steps.
 
 **Published as counts**, per month (`timeseries.json`) and per hexagon and
 month (`hexes_monthly.json`): how many detections on Posidonia had a
