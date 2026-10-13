@@ -94,11 +94,26 @@ jobs:
           id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$CACHE_TAG" --jq ".assets[] | select(.name == \"$tmp\") | .id")
           gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name="$CACHE_ASSET" --silent
 
+      # A new detection schema makes every cached release stale, and fetching the whole archive
+      # again can take more than one run, or fail for one release. Until it is complete there is
+      # nothing to build: the downloads so far are saved above and the next run goes on.
+      - name: List releases still to fetch again
+        id: stale
+        working-directory: pipeline
+        run: |
+          periods=$(uv run --locked posidonia-watch stale | paste -sd, -)
+          echo "periods=$periods" >> "$GITHUB_OUTPUT"
+          if [ -n "$periods" ]; then
+            echo "::warning::Not building: releases cached under an older detection schema still have to be fetched again ($periods). The next run continues."
+          fi
+
       - name: Build site data
+        if: steps.stale.outputs.periods == ''
         working-directory: pipeline
         run: uv run --locked posidonia-watch build
 
       - name: Compare with the published data
+        if: steps.stale.outputs.periods == ''
         id: data
         run: |
           meta=web/public/data/meta.json
