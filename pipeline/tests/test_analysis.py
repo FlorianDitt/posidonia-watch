@@ -57,6 +57,19 @@ def test_dedupe_drops_same_detection_from_two_processing_versions():
     assert len(analysis.dedupe(df)) == 2
 
 
+def test_dedupe_keeps_the_matched_most_confident_version_of_a_detection():
+    df = pd.DataFrame({
+        "lat": [43.1, 43.1, 43.1, 43.2],
+        "lon": [7.1, 7.1, 7.1, 7.1],
+        "detect_timestamp": ["2025-07-01 10:30:05"] * 4,
+        "mmsi": [None, "247000001", "247000001", None],
+        "matching_confidence": [np.nan, np.float32(0.5), np.float32(0.95), np.nan],
+    })
+    out = analysis.dedupe(df)
+    assert out.index.tolist() == [2, 3]  # original order kept
+    assert out["matching_confidence"].iloc[0] == np.float32(0.95)
+
+
 def test_density_is_nan_without_clear_overpasses():
     out = analysis.density([4, 3, 0], [2, 0, 5])
     assert out[0] == 2.0
