@@ -64,6 +64,11 @@ def anchored_mask(df: pd.DataFrame, params: dict, filters: dict) -> np.ndarray:
     return (speed < params["speed_kn_max"]) & quality_mask(df, filters)
 
 
+def _widened(col: pd.Series) -> np.ndarray:
+    """float32 cache column as float64 without the widening error (0.9 is stored as 0.89999998)."""
+    return np.round(pd.to_numeric(col, errors="coerce").to_numpy(dtype=float), 6)
+
+
 def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     """AIS view of each detection: matched, flag, reported speed, confident, and AIS-confirmed stationary.
 
@@ -73,9 +78,8 @@ def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     """
     mmsi = df["mmsi"]
     matched = (mmsi.notna() & (mmsi.astype(str).str.strip() != "")).to_numpy()
-    conf = pd.to_numeric(df["matching_confidence"], errors="coerce").to_numpy(dtype=float)
-    speed = ((pd.to_numeric(df["ais_speed_kn_before"], errors="coerce")
-              + pd.to_numeric(df["ais_speed_kn_after"], errors="coerce")) / 2).to_numpy(dtype=float)
+    conf = _widened(df["matching_confidence"])
+    speed = (_widened(df["ais_speed_kn_before"]) + _widened(df["ais_speed_kn_after"])) / 2
     confident = matched & (conf >= params["ais_confidence_min"])
     return pd.DataFrame({
         "ais_matched": matched,
