@@ -101,6 +101,7 @@ jobs:
         id: stale
         working-directory: pipeline
         run: |
+          set -o pipefail  # a failing `stale` must fail the step, not read as nothing stale
           periods=$(uv run --locked posidonia-watch stale | paste -sd, -)
           echo "periods=$periods" >> "$GITHUB_OUTPUT"
           if [ -n "$periods" ]; then
