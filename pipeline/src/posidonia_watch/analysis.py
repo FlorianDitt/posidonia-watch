@@ -152,9 +152,10 @@ def monthly_totals(anch: pd.DataFrame, months: list[str]) -> pd.DataFrame:
     out["large_on_posidonia"] = (
         g.apply(lambda x: int((x["on_posidonia"] & x["large"]).sum()), include_groups=False) if len(anch) else 0
     )
-    on = anch[anch["on_posidonia"]].groupby("month")
-    out["ais_matched_on_posidonia"] = on["ais_confident"].sum()
-    out["ais_stationary_on_posidonia"] = on["ais_stationary"].sum()
+    on = anch[anch["on_posidonia"]]
+    for name, col in (("ais_matched", "ais_confident"), ("ais_stationary", "ais_stationary")):
+        out[f"{name}_on_posidonia"] = on.groupby("month")[col].sum()
+        out[f"{name}_large_on_posidonia"] = on[on["large"]].groupby("month")[col].sum()
     return out.fillna(0).astype(int)
 
 
