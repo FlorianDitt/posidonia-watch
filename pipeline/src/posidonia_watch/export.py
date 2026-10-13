@@ -234,6 +234,16 @@ def _check_ais_nesting(hm: dict) -> None:
         _check(all(0 <= x <= y for x, y in zip(hm[large], hm[every])), f"hexes_monthly {large} <= {every}")
 
 
+def _check_points_ais(pts: dict) -> None:
+    """Class 0 publishes no AIS value; a confident match (class >= 2) always has its confidence."""
+    _check(all(c in (0, 1, 2, 3) for c in pts["ais_class"]), "points.ais_class values")
+    for k in ("ais_conf", "ais_speed_kn", "ais_length_m", "ais_flag"):
+        _check(all(v is None for c, v in zip(pts["ais_class"], pts[k]) if c == 0),
+               f"points.{k} must be null without a match")
+    _check(all(v is not None for c, v in zip(pts["ais_class"], pts["ais_conf"]) if c >= 2),
+           "points.ais_conf must be set for a confident match")
+
+
 def validate_outputs(out_dir: Path) -> None:
     """Raise ContractError if any output file deviates from docs/data-contract.md."""
     for f in FILES:
@@ -294,9 +304,7 @@ def validate_outputs(out_dir: Path) -> None:
     for k in ("lon", "lat", "month", "length_m", "country", "ais_class", "ais_conf", "ais_speed_kn", "ais_length_m",
               "ais_flag"):
         _check(len(pts[k]) == p, f"points.{k} length")
-    _check(all(c in (0, 1, 2, 3) for c in pts["ais_class"]), "points.ais_class values")
-    _check(all((c == 0) == (v is None) for c, v in zip(pts["ais_class"], pts["ais_conf"])),
-           "points.ais_conf must be null iff ais_class == 0")
+    _check_points_ais(pts)
     _check("mmsi" not in pts, "points must not contain the MMSI")
     _check(all(0 <= i < n for i in pts["month"]), "points.month index out of range")
 

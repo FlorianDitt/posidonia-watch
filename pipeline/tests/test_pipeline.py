@@ -102,6 +102,29 @@ def test_points_obj_classifies_on_the_unrounded_values():
     assert pts["ais_class"] == [3, 1]
 
 
+def test_points_obj_keeps_a_match_without_confidence_as_uncertain():
+    anch = pd.DataFrame({
+        "on_posidonia": [True], "month": ["2025-07"], "detect_timestamp": ["2025-07-02"],
+        "lon": [3.0], "lat": [42.0], "length_m_inferred": [30.0], "country": ["FRA"], "mmsi": ["227000009"],
+        "ais_matched": [True], "matching_confidence": [np.nan],
+        "ais_confident": [False], "ais_stationary": [False],
+        "ais_speed_kn": [0.1], "ais_length_m": [33.0],
+    })
+    pts = export.points_obj(anch, ["2025-07"], cap=10)
+    assert pts["ais_class"] == [1]
+    assert pts["ais_conf"] == [None]
+    assert pts["ais_flag"] == ["FR"]
+    export._check_points_ais(pts)
+
+
+def test_points_ais_check_rejects_values_on_unmatched_points_and_confident_matches_without_confidence():
+    base = {"ais_speed_kn": [None], "ais_length_m": [None], "ais_flag": [None]}
+    with pytest.raises(export.ContractError):
+        export._check_points_ais({"ais_class": [0], "ais_conf": [0.5], **base})
+    with pytest.raises(export.ContractError):
+        export._check_points_ais({"ais_class": [2], "ais_conf": [None], **base})
+
+
 def test_ais_nesting_check_covers_the_large_counts():
     row = {"on_posidonia": [5], "large_on_posidonia": [2], "ais_on_posidonia": [3], "ais_large_on_posidonia": [1],
            "ais_stationary_on_posidonia": [2], "ais_stationary_large_on_posidonia": [1]}
