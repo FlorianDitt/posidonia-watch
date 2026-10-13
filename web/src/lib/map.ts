@@ -22,8 +22,7 @@ type SeasonSel = 'ALL' | Season;
 type Boats = 'all' | 'ais' | 'ais_st';
 
 const MED_BBOX: [number, number, number, number] = [-6.0, 30.0, 36.5, 46.0];
-const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/positron';
-const STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const POSIDONIA_MINZOOM = 8;
 const POINTS_MINZOOM = 11;
 /** Below this zoom hexes are drawn as centroid dots. */
@@ -42,11 +41,10 @@ const METRIC_LABEL: Record<Metric, (largeLen: number) => string> = {
 
 /** Fetch the basemap style; if OpenFreeMap is unreachable, fall back to a plain background so our data still renders. */
 async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
-  const url = isDark() ? STYLE_DARK : STYLE_LIGHT;
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(STYLE_URL, { signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()) as maplibregl.StyleSpecification;
@@ -55,16 +53,13 @@ async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
     return {
       version: 8,
       sources: {},
-      layers: [{ id: 'background', type: 'background', paint: { 'background-color': isDark() ? '#16252a' : '#dfe8ea' } }],
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#dfe8ea' } }],
     };
   }
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-const isDark = () =>
-  document.documentElement.dataset.theme === 'dark' || (document.documentElement.dataset.theme !== 'light' && darkQuery.matches);
 
 interface State {
   metric: Metric;
@@ -291,7 +286,7 @@ function ramp(): string[] {
   return [0, 1, 2, 3, 4].map((i) => cssVar(`--ramp-${i}`));
 }
 
-function zeroColor() { return isDark() ? 'rgba(180,195,192,0.18)' : 'rgba(68,87,92,0.12)'; }
+const ZERO_COLOR = 'rgba(68,87,92,0.12)';
 
 let currentBreaks: number[] = [];
 
@@ -307,8 +302,8 @@ function fillColorExpr(): ExpressionSpecification {
   currentBreaks.forEach((b, k) => step.push(b, pick(k + 1)));
   return [
     'case',
-    ['==', ['get', key], null], zeroColor(),
-    ['<=', ['to-number', ['get', key]], 0], zeroColor(),
+    ['==', ['get', key], null], ZERO_COLOR,
+    ['<=', ['to-number', ['get', key]], 0], ZERO_COLOR,
     step,
   ] as unknown as ExpressionSpecification;
 }
@@ -359,7 +354,7 @@ function renderLegend() {
   el.innerHTML = `
     <div class="h-3 rounded-sm" style="background:${bar}"></div>
     <div class="relative h-6">${ticks.join('')}</div>
-    <div class="mt-1 flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`;
+    <div class="mt-1 flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-sm border border-line" style="background:${ZERO_COLOR}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`;
   el.title = 'Classes are quantiles of non-zero cells';
 }
 
@@ -501,12 +496,12 @@ export async function initMap() {
     if (!map.getLayer('posidonia-fill')) {
       map.addLayer({
         id: 'posidonia-fill', type: 'fill', source: 'posidonia', minzoom: POSIDONIA_MINZOOM,
-        paint: { 'fill-color': cssVar('--seagrass'), 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.18, 12, 0.32] },
+        paint: { 'fill-color': cssVar('--map-seagrass'), 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.18, 12, 0.32] },
         layout: { visibility: state.showPosidonia ? 'visible' : 'none' },
       }, before);
       map.addLayer({
         id: 'posidonia-line', type: 'line', source: 'posidonia', minzoom: POSIDONIA_MINZOOM,
-        paint: { 'line-color': cssVar('--seagrass'), 'line-width': 0.8, 'line-opacity': 0.7 },
+        paint: { 'line-color': cssVar('--map-seagrass'), 'line-width': 0.8, 'line-opacity': 0.7 },
         layout: { visibility: state.showPosidonia ? 'visible' : 'none' },
       }, before);
     }
@@ -524,7 +519,7 @@ export async function initMap() {
       map.addLayer({
         id: 'hex-line', type: 'line', source: 'hexes',
         paint: {
-          'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], cssVar('--ink'), cssVar('--hex-line')],
+          'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], cssVar('--map-ink'), cssVar('--hex-line')],
           'line-width': ['interpolate', ['linear'], ['zoom'],
             5, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0],
             8, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0.5],
@@ -552,7 +547,7 @@ export async function initMap() {
             11, ['interpolate', ['linear'], ['get', 'L'], 8, 2, largeLen, 3.5, 60, 6],
             15, ['interpolate', ['linear'], ['get', 'L'], 8, 4, largeLen, 7, 60, 12]],
           // confident AIS matches get a dark ring
-          'circle-stroke-color': ['case', ['==', ['get', 'a'], 1], cssVar('--ink'), cssVar('--surface')],
+          'circle-stroke-color': ['case', ['==', ['get', 'a'], 1], cssVar('--map-ink'), cssVar('--map-halo')],
           'circle-stroke-width': ['case', ['==', ['get', 'a'], 1], 2, 1],
           'circle-opacity': 0.9,
         },
@@ -640,16 +635,6 @@ export async function initMap() {
     console.warn('map error', e?.error ?? e);
   });
   map.on('moveend', () => { ensurePosidonia(); ensurePoints(); });
-
-  // swapping the basemap drops our layers; style.load re-adds them in the new palette
-  let dark = isDark();
-  const onTheme = async () => {
-    if (isDark() === dark) return;
-    dark = isDark();
-    map.setStyle(await basemapStyle(), { diff: false });
-  };
-  darkQuery.addEventListener('change', onTheme);
-  window.addEventListener('themechange', onTheme);
 
   let hoveredId: number | null = null;
   const canHover = window.matchMedia('(hover: hover)').matches;

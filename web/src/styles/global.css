@@ -1,98 +1,39 @@
 @import "tailwindcss";
 
-/* dark: follows the OS unless lib/theme.ts forces a theme via data-theme */
-@custom-variant dark {
-  @media (prefers-color-scheme: dark) {
-    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) { @slot; }
-  }
-  &:where([data-theme="dark"], [data-theme="dark"] *) { @slot; }
-}
-
-/* Design tokens: calm ocean / seagrass palette. Light by default, dark via prefers-color-scheme or data-theme. */
+/* Design tokens: one navy design. The UI chrome is dark; the --map-* tokens and the ramp are drawn on the
+   light, colored basemap and are chosen for that background. */
 :root {
-  color-scheme: light;
-  --bg: #f6f7f4;
-  --surface: #ffffff;
-  --surface-2: #eef2ef;
-  --ink: #10232a;
-  --ink-2: #44575c;
-  --muted: #66777b;
-  --line: #d9e1de;
-  --sea: #1b5e7a;
-  --seagrass: #2e7d55;
-  --seagrass-soft: #dcefe3;
-  --focus: #1b5e7a;
-
-  /* Chart series (validated reference palette slots 1 & 2) */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-context: #66777b;
-  --grid: #e3e8e6;
-
-  /* Sequential pressure ramp for the hex map (low -> high) */
-  --ramp-0: #6e2205;
-  --ramp-1: #a63c0f;
-  --ramp-2: #d45a12;
-  --ramp-3: #ee7b33;
-  --ramp-4: #f8a161;
-  --hex-line: rgba(110, 34, 5, 0.35);
-  --point-small: #1b5e7a;
-  --point-large: #c0265e;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --bg: #0d1719;
-    --surface: #142225;
-    --surface-2: #1a2b2e;
-    --ink: #e7eeec;
-    --ink-2: #b4c3c0;
-    --muted: #8fa19e;
-    --line: #2a3d40;
-    --sea: #7cc0dc;
-    --seagrass: #6cc597;
-    --seagrass-soft: #1d3a2c;
-    --focus: #7cc0dc;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-context: #8fa19e;
-    --grid: #233437;
-    --ramp-0: #fdd3a2;
-    --ramp-1: #f9a55c;
-    --ramp-2: #ec7a2c;
-    --ramp-3: #c9531d;
-    --ramp-4: #9c3a1c;
-    --hex-line: rgba(253, 211, 162, 0.3);
-    --point-small: #7cc0dc;
-    --point-large: #ff6fa3;
-  }
-}
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0d1719;
-  --surface: #142225;
-  --surface-2: #1a2b2e;
-  --ink: #e7eeec;
-  --ink-2: #b4c3c0;
-  --muted: #8fa19e;
-  --line: #2a3d40;
+  --bg: #0b1222;
+  --surface: #111a2e;
+  --surface-2: #1b253a;
+  --ink: #f1f5f9;
+  --ink-2: #c4cddb;
+  --muted: #8d99ad;
+  --line: #2a3550;
   --sea: #7cc0dc;
-  --seagrass: #6cc597;
+  --seagrass: #5fbf8a;
   --seagrass-soft: #1d3a2c;
   --focus: #7cc0dc;
+
+  /* Chart series (validated reference palette slots 1 & 2, dark variants) */
   --series-1: #3987e5;
   --series-2: #d95926;
-  --series-context: #8fa19e;
-  --grid: #233437;
-  --ramp-0: #fdd3a2;
-  --ramp-1: #f9a55c;
-  --ramp-2: #ec7a2c;
-  --ramp-3: #c9531d;
-  --ramp-4: #9c3a1c;
-  --hex-line: rgba(253, 211, 162, 0.3);
-  --point-small: #7cc0dc;
-  --point-large: #ff6fa3;
+  --series-context: #8d99ad;
+  --grid: #232e45;
+
+  /* Sequential pressure ramp for the hex map (low -> high) */
+  --ramp-0: #f8a161;
+  --ramp-1: #ee7b33;
+  --ramp-2: #d45a12;
+  --ramp-3: #a63c0f;
+  --ramp-4: #6e2205;
+  --hex-line: rgba(110, 34, 5, 0.35);
+  --map-seagrass: #2e7d55;
+  --map-ink: #10232a;
+  --map-halo: #ffffff;
+  --point-small: #1b5e7a;
+  --point-large: #c0265e;
 }
 
 @theme inline {
@@ -162,9 +103,14 @@ body {
   /* keep attribution/scale above the collapsed bottom sheet */
   .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 52px; }
 }
+/* map controls in the navy chrome; maplibre-gl.css loads after this file, hence !important */
 .maplibregl-ctrl-group, .maplibregl-ctrl-attrib, .maplibregl-ctrl-scale {
-  @variant dark { background: rgba(20, 34, 37, 0.9) !important; color: var(--ink-2); border-color: var(--ink-2); }
+  background: rgba(17, 26, 46, 0.92) !important;
+  color: var(--ink-2) !important;
+  border-color: var(--ink-2) !important;
 }
-.maplibregl-ctrl-attrib a { @variant dark { color: var(--ink-2); } }
-.maplibregl-ctrl-group button .maplibregl-ctrl-icon { @variant dark { filter: invert(1); } }
-.maplibregl-ctrl-group button + button { @variant dark { border-top-color: var(--line); } }
+.maplibregl-ctrl-group { border-radius: 10px !important; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important; }
+.maplibregl-ctrl-attrib.maplibregl-compact-show { max-width: min(30rem, calc(100vw - 2rem)); border-radius: 10px !important; padding: 6px 30px 6px 10px !important; line-height: 1.5; }
+.maplibregl-ctrl-attrib a { color: var(--ink) !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon, .maplibregl-ctrl-attrib-button { filter: invert(1); }
+.maplibregl-ctrl-group button + button { border-top-color: var(--line) !important; }
