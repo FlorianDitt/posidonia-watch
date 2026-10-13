@@ -222,6 +222,18 @@ def _check(cond, msg):
         raise ContractError(msg)
 
 
+def _check_ais_nesting(hm: dict) -> None:
+    """Per row: stationary <= AIS match <= all, for all boats and for large ones, and large <= all boats."""
+    chains = [
+        ("ais_stationary_on_posidonia", "ais_on_posidonia", "on_posidonia"),
+        ("ais_stationary_large_on_posidonia", "ais_large_on_posidonia", "large_on_posidonia"),
+    ]
+    for chain in chains:
+        _check(all(s <= a <= o for s, a, o in zip(*(hm[k] for k in chain))), f"hexes_monthly {' <= '.join(chain)}")
+    for every, large in zip(*chains):
+        _check(all(0 <= x <= y for x, y in zip(hm[large], hm[every])), f"hexes_monthly {large} <= {every}")
+
+
 def validate_outputs(out_dir: Path) -> None:
     """Raise ContractError if any output file deviates from docs/data-contract.md."""
     for f in FILES:
@@ -265,8 +277,7 @@ def validate_outputs(out_dir: Path) -> None:
     r = len(hm["cell"])
     for k in ("month", "on_posidonia", "large_on_posidonia", *AIS_SERIES.values()):
         _check(len(hm[k]) == r, f"hexes_monthly.{k} length")
-    nested = zip(hm["ais_stationary_on_posidonia"], hm["ais_on_posidonia"], hm["on_posidonia"])
-    _check(all(s <= a <= o for s, a, o in nested), "hexes_monthly AIS counts must nest")
+    _check_ais_nesting(hm)
     _check(all(0 <= i < m for i in hm["cell"]), "hexes_monthly.cell index out of range")
     _check(all(0 <= k < n for k in hm["month"]), "hexes_monthly.month index out of range")
     _check(len(hm["clear_overpasses"]) == m * n, "hexes_monthly.clear_overpasses must be cells x months")
