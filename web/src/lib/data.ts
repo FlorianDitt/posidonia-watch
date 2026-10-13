@@ -37,6 +37,11 @@ export interface Timeseries {
   anchored_total: number[];
   anchored_on_posidonia: number[];
   large_on_posidonia: number[];
+  /** Confident AIS matches and the AIS-stationary part of them, all and large; missing in data built before AIS matching. */
+  ais_matched_on_posidonia?: number[];
+  ais_matched_large_on_posidonia?: number[];
+  ais_stationary_on_posidonia?: number[];
+  ais_stationary_large_on_posidonia?: number[];
   by_country: Record<string, CountrySeries>;
 }
 

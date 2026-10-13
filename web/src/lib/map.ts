@@ -95,6 +95,8 @@ let posidoniaGeojson: GeoJSON.FeatureCollection | null = null;
 let pointsLoading = false;
 let posidoniaLoading = false;
 let largeLen = 24;
+/** hexes_monthly and timeseries both carry every AIS count the Boats choices need (older data does not). */
+let aisAvailable = false;
 
 function setStatus(msg: string | null) {
   const el = $('map-status');
@@ -192,7 +194,7 @@ function selectedMonthIdx(): number[] | null {
 function aggregate(): Agg {
   const h = hexes!;
   const sel = selectedMonthIdx();
-  const ais = state.boats !== 'all' && aisMonthly() !== null;
+  const ais = state.boats !== 'all' && aisAvailable;
   const key = `${ais ? state.boats : 'all'}|${sel === null ? 'all' : monthly ? sel.join(',') : `season:${state.season}`}`;
   if (aggCache?.key === key) return aggCache.agg;
   const num = (a: (number | null)[] | undefined) => (a ?? []).map((x) => (x == null ? NaN : x));
@@ -231,32 +233,11 @@ function aggregate(): Agg {
   return agg;
 }
 
-/** hexes_monthly when it carries the AIS counts (data built before AIS matching does not). */
-function aisMonthly(): HexesMonthly | null {
-  return monthly?.ais_on_posidonia && monthly.ais_stationary_on_posidonia ? monthly : null;
-}
-
 /** The per-row [all, large] counts of hexes_monthly for the chosen boats. */
 function rowCounts(m: HexesMonthly): [number[], number[]] {
-  if (state.boats === 'ais' && m.ais_on_posidonia && m.ais_large_on_posidonia) return [m.ais_on_posidonia, m.ais_large_on_posidonia];
-  if (state.boats === 'ais_st' && m.ais_stationary_on_posidonia && m.ais_stationary_large_on_posidonia) {
-    return [m.ais_stationary_on_posidonia, m.ais_stationary_large_on_posidonia];
-  }
+  if (aisAvailable && state.boats === 'ais') return [m.ais_on_posidonia!, m.ais_large_on_posidonia!];
+  if (aisAvailable && state.boats === 'ais_st') return [m.ais_stationary_on_posidonia!, m.ais_stationary_large_on_posidonia!];
   return [m.on_posidonia, m.large_on_posidonia];
-}
-
-/** Month totals (index = meta.months) for the chosen boats, summed from hexes_monthly. */
-let monthTotalsCache: { key: string; on: number[]; large: number[] } | null = null;
-function aisMonthTotals(): { on: number[]; large: number[] } | null {
-  const m = aisMonthly();
-  if (!m || state.boats === 'all') return null;
-  if (monthTotalsCache?.key === state.boats) return monthTotalsCache;
-  const on = new Array<number>(m.months.length).fill(0);
-  const large = new Array<number>(m.months.length).fill(0);
-  const [onRows, largeRows] = rowCounts(m);
-  for (let r = 0; r < m.cell.length; r++) { on[m.month[r]] += onRows[r]; large[m.month[r]] += largeRows[r]; }
-  monthTotalsCache = { key: state.boats, on, large };
-  return monthTotalsCache;
 }
 
 const BOATS_LABEL: Record<Boats, string> = { all: 'All', ais: 'AIS match', ais_st: 'AIS: anchored' };
@@ -445,6 +426,10 @@ export async function initMap() {
     if (hm && M > 0 && hm.months?.join() === meta!.months.join() && hm.clear_overpasses?.length === hx.h3.length * M) monthly = hm;
     writeValues();
   }
+  aisAvailable = monthly !== null && ts !== null
+    && [monthly.ais_on_posidonia, monthly.ais_large_on_posidonia, monthly.ais_stationary_on_posidonia,
+      monthly.ais_stationary_large_on_posidonia, ts.ais_matched_on_posidonia, ts.ais_matched_large_on_posidonia,
+      ts.ais_stationary_on_posidonia, ts.ais_stationary_large_on_posidonia].every(Array.isArray);
 
   currentBreaks = quantileBreaks(activeValues(), activeIsCount());
   renderLegend();
@@ -476,7 +461,7 @@ export async function initMap() {
   state.showSmall = checked('toggle-small');
   state.showLarge = checked('toggle-large');
   const boats = document.querySelector<HTMLInputElement>('input[name="boats"]:checked')?.value;
-  if (boats) state.boats = boats as Boats;
+  if (boats && aisAvailable) state.boats = boats as Boats;
   const metric = document.querySelector<HTMLInputElement>('input[name="metric"]:checked')?.value;
   if (metric) state.metric = metric as Metric;
 
@@ -706,8 +691,9 @@ export async function initMap() {
   const seasonButtons = document.querySelectorAll<HTMLButtonElement>('#season-group button');
   const timelineValues = () => {
     const large = state.metric === 'large_on_posidonia';
-    const aisTotals = aisMonthTotals();
-    const series = aisTotals ? (large ? aisTotals.large : aisTotals.on) : large ? ts?.large_on_posidonia : ts?.anchored_on_posidonia;
+    const series = state.boats === 'ais' ? (large ? ts?.ais_matched_large_on_posidonia : ts?.ais_matched_on_posidonia)
+      : state.boats === 'ais_st' ? (large ? ts?.ais_stationary_large_on_posidonia : ts?.ais_stationary_on_posidonia)
+      : large ? ts?.large_on_posidonia : ts?.anchored_on_posidonia;
     return calendar.map((e) => (e.idx < 0 ? NaN : series?.[e.idx] ?? NaN));
   };
   const timeline = createTimeline($('timeline'), calendar.map((e) => e.month), {
@@ -790,7 +776,7 @@ export async function initMap() {
     r.addEventListener('change', () => { if (r.checked) { state.metric = r.value as Metric; update(); } }));
   // Data without AIS counts (older builds) cannot recount the map, so only "All" is offered
   const boatInputs = document.querySelectorAll<HTMLInputElement>('input[name="boats"]');
-  if (!aisMonthly()) {
+  if (!aisAvailable) {
     state.boats = 'all';
     boatInputs.forEach((r) => {
       r.checked = r.value === 'all';
