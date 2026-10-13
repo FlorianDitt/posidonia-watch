@@ -61,8 +61,10 @@ Mediterranean-wide totals per month, same order as `meta.months`.
   "anchored_total":      [0, 0],
   "anchored_on_posidonia": [0, 0],
   "large_on_posidonia":  [0, 0],
-  "ais_matched_on_posidonia":    [0, 0],
-  "ais_stationary_on_posidonia": [0, 0],
+  "ais_matched_on_posidonia":          [0, 0],
+  "ais_matched_large_on_posidonia":    [0, 0],
+  "ais_stationary_on_posidonia":       [0, 0],
+  "ais_stationary_large_on_posidonia": [0, 0],
   "by_country": {
     "FRA": { "name": "France", "anchored_on_posidonia": [0, 0], "large_on_posidonia": [0, 0] }
   }
@@ -72,7 +74,9 @@ Mediterranean-wide totals per month, same order as `meta.months`.
 `ais_matched_on_posidonia` counts anchored-on-Posidonia detections with a
 confident AIS match; `ais_stationary_on_posidonia` the AIS-stationary part of
 those. Their ratio is how often the image-based "anchored" agrees with what
-the boat reported (matches without AIS speed count as not confirmed).
+the boat reported (matches without AIS speed count as not confirmed). The
+`*_large_*` arrays count the large boats among them. Each of the four equals
+the sum of its `hexes_monthly.json` counterpart over the cells of that month.
 
 `by_country` is keyed by ISO3 of the EEZ the detection falls in (Marine
 Regions). Key `"UNK"` for detections outside any EEZ or if EEZ lookup is
@@ -129,7 +133,9 @@ indexes `meta.months`.
 The `ais_*` arrays are row-aligned with `on_posidonia`: confident AIS matches
 and AIS-stationary detections in that cell and month (all and large). They let
 the web filter the map to AIS-matched boats. For every row
-`ais_stationary_on_posidonia <= ais_on_posidonia <= on_posidonia`.
+`ais_stationary_on_posidonia <= ais_on_posidonia <= on_posidonia`, likewise
+for the three `*large*` arrays, and each large count is at most its all-boats
+count.
 
 `cell`, `month`, `on_posidonia` and `large_on_posidonia` are sparse rows,
 only where `on_posidonia > 0`. `clear_overpasses` is dense, cell-major:
@@ -148,6 +154,7 @@ Columnar, capped at 200 000 rows (most recent first if capped).
   "month": [87],
   "length_m": [31.5],
   "country": ["FRA"],
+  "ais_class": [3],
   "ais_conf": [0.97],
   "ais_speed_kn": [0.2],
   "ais_length_m": [33.0],
@@ -156,13 +163,19 @@ Columnar, capped at 200 000 rows (most recent first if capped).
 ```
 
 `month` is an index into `meta.months`. Coordinates rounded to 5 decimals.
+`ais_class` is the pipeline's AIS classification of the detection: `0` no
+match, `1` a match below `params.ais_confidence_min`, `2` a confident match,
+`3` a confident match that is AIS-stationary. It is decided on the unrounded
+values and matches the counts in `hexes_monthly.json`; consumers must use it
+instead of comparing the rounded `ais_conf` and `ais_speed_kn` with the
+thresholds.
 `ais_conf` is the AIS match confidence (2 decimals), `null` without a match.
 `ais_speed_kn` (1 decimal) and `ais_length_m` (1 decimal) come from the
 matched vessel's AIS messages, `null` without a match or when AIS lacks them.
 `ais_flag` is the ISO 3166-1 alpha-2 flag state from the matched MMSI's first
-three digits (its MID), `null` without a match or for an unknown MID. All AIS
-fields are published for every match; consumers apply
-`params.ais_confidence_min` themselves.
+three digits (its MID), `null` without a match or for an unknown MID. The
+`ais_conf`, `ais_speed_kn`, `ais_length_m` and `ais_flag` values are published
+for every match, also the uncertain ones.
 
 ## `posidonia.geojson`
 
