@@ -85,6 +85,8 @@ const AIS_CONF_MIN = 0.9;
 const hexes = {
   h3: [], country: [], on_posidonia: [], large_on_posidonia: [], clear_overpasses: [],
   density: [], posidonia_km2: [], by_season: { DJF: [], MAM: [], JJA: [], SON: [] },
+  by_season_large: { DJF: [], MAM: [], JJA: [], SON: [] },
+  by_season_clear_overpasses: { DJF: [], MAM: [], JJA: [], SON: [] },
 };
 const ts = {
   months,
@@ -111,6 +113,7 @@ const pickMonth = () => { const x = rand() * acc; return cum.findIndex((c) => c 
 for (const [i, row] of rows.entries()) {
   const clear = i % 97 === 5 ? 0 : Math.round(110 + rand() * 90);
   const seasons = { DJF: 0, MAM: 0, JJA: 0, SON: 0 };
+  const seasonsLarge = { DJF: 0, MAM: 0, JJA: 0, SON: 0 };
   const perMonth = months.map(() => 0);
   // per month: [all, large, ais, ais large, ais stationary, ais stationary large]
   const cellMonth = months.map(() => [0, 0, 0, 0, 0, 0]);
@@ -127,7 +130,7 @@ for (const [i, row] of rows.entries()) {
     const isLarge = len >= 24;
     perMonth[mi]++;
     seasons[seasonOf(monthNum(months[mi]))]++;
-    if (isLarge) large++;
+    if (isLarge) { large++; seasonsLarge[seasonOf(monthNum(months[mi]))]++; }
     ts.anchored_on_posidonia[mi]++;
     cc.anchored_on_posidonia[mi]++;
     if (isLarge) { ts.large_on_posidonia[mi]++; cc.large_on_posidonia[mi]++; }
@@ -174,7 +177,12 @@ for (const [i, row] of rows.entries()) {
     hexesMonthly.ais_stationary_large_on_posidonia.push(cm[5]);
   });
   // spread the cell's clear overpasses evenly over the months (no extra random draws)
-  months.forEach((_, mi) => hexesMonthly.clear_overpasses.push(Math.floor(clear / months.length) + (mi < clear % months.length ? 1 : 0)));
+  const seasonsClear = { DJF: 0, MAM: 0, JJA: 0, SON: 0 };
+  months.forEach((m, mi) => {
+    const c = Math.floor(clear / months.length) + (mi < clear % months.length ? 1 : 0);
+    hexesMonthly.clear_overpasses.push(c);
+    seasonsClear[seasonOf(monthNum(m))] += c;
+  });
   const density = clear === 0 ? null : round(row.on / clear, 4);
   hexes.h3.push(row.h3);
   hexes.country.push(row.country);
@@ -183,7 +191,11 @@ for (const [i, row] of rows.entries()) {
   hexes.clear_overpasses.push(clear);
   hexes.density.push(density);
   hexes.posidonia_km2.push(round(0.2 + rand() * 4.6, 2));
-  for (const s of Object.keys(seasons)) hexes.by_season[s].push(seasons[s]);
+  for (const s of Object.keys(seasons)) {
+    hexes.by_season[s].push(seasons[s]);
+    hexes.by_season_large[s].push(seasonsLarge[s]);
+    hexes.by_season_clear_overpasses[s].push(seasonsClear[s]);
+  }
   const peak = perMonth.indexOf(Math.max(...perMonth));
   hotspotCandidates.push({
     h3: row.h3, lon: round(clon, 4), lat: round(clat, 4), country: row.country,
