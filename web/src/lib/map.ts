@@ -334,7 +334,8 @@ function dotPaint() {
     'circle-color': fillColorExpr(),
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, ['case', positive, 3, 1.5], DOTS_MAXZOOM, ['case', positive, 6, 3]],
     'circle-stroke-color': cssVar('--map-halo'),
-    'circle-stroke-width': 1,
+    // halo only on cells with boats: thousands of haloed empty cells wash out the coastal sea
+    'circle-stroke-width': ['case', positive, 1, 0],
     'circle-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
     'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
   } as unknown as NonNullable<maplibregl.CircleLayerSpecification['paint']>;
