@@ -95,6 +95,8 @@ let posidoniaGeojson: GeoJSON.FeatureCollection | null = null;
 let pointsLoading = false;
 let posidoniaLoading = false;
 let largeLen = 24;
+/** Confidence from which a match is confident (meta.params); null in data that does not say. */
+let aisConfMin: number | null = null;
 /** hexes_monthly and timeseries both carry every AIS count the Boats choices need (older data does not). */
 let aisAvailable = false;
 
@@ -391,13 +393,19 @@ type AisProps = { a?: number; st?: number; ac?: number | null; as?: number | nul
 function aisPopupHtml(p: AisProps): string {
   if (p.a == null) return ''; // data without AIS: unknown, which is not "no match"
   if (p.st == null) return '<div class="mt-1 border-t border-line pt-1 text-muted">No AIS match</div>'; // st is set for matches only
-  if (!p.a) return `<div class="mt-1 border-t border-line pt-1 text-muted">Uncertain AIS match${p.ac != null ? ` (confidence ${fmtNum(p.ac, 2)})` : ''}</div>`;
+  if (!p.a) return `<div class="mt-1 border-t border-line pt-1 text-muted">Uncertain AIS match${p.ac != null ? ` (confidence ${uncertainConf(p.ac)})` : ''}</div>`;
   const flag = p.af ? `<div><span class="text-base leading-none">${flagEmoji(p.af)}</span> ${escapeHtml(flagName(p.af))} flag</div>` : '';
   const facts = [p.al != null ? `${fmtNum(p.al, 1)} m` : null, p.as != null ? `${fmtNum(p.as, 1)} kn` : null].filter(Boolean).join(' · ');
   const moving = p.as != null && !p.st
     ? `<div class="font-semibold" style="color:var(--point-large)">AIS reports it moving</div>` : '';
   return `<div class="mt-1 border-t border-line pt-1"><div class="font-medium text-ink-2">AIS match</div>${flag}
     ${facts ? `<div class="text-muted">${facts} reported</div>` : ''}${moving}</div>`;
+}
+
+/** Published confidence of an uncertain match. It is rounded, so one just below the threshold can read as the
+ *  threshold itself; that is shown as below it instead of as a value a confident match would have. */
+function uncertainConf(ac: number): string {
+  return aisConfMin != null && ac >= aisConfMin ? `&lt; ${fmtNum(aisConfMin, 2)}` : fmtNum(ac, 2);
 }
 
 export async function initMap() {
@@ -411,6 +419,7 @@ export async function initMap() {
   meta = m;
   if (ts?.by_country) setCountryNames(Object.fromEntries(Object.entries(ts.by_country).map(([k, v]) => [k, v.name])));
   largeLen = meta?.params?.large_length_m ?? 24;
+  aisConfMin = meta?.params?.ais_confidence_min ?? null;
   calendar = buildCalendar(meta?.months ?? []);
   if (hx && Array.isArray(hx.h3) && hx.h3.length > 0) {
     hexes = hx;
