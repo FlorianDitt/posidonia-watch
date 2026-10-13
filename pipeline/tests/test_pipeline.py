@@ -120,6 +120,15 @@ def test_num_makes_values_json_safe():
     assert not math.isnan(export._num(np.float32(1.5)))
 
 
+def test_floor_rounds_down_but_not_below_the_float32_value():
+    assert export._floor(0.896, 2) == 0.89
+    assert export._floor(0.899999, 2) == 0.89
+    assert export._floor(np.float32(0.9), 2) == 0.9  # widens to 0.89999998
+    assert export._floor(np.float32(0.57), 2) == 0.57
+    assert export._floor(1.0, 2) == 1.0
+    assert export._floor(float("nan"), 2) is None
+
+
 def test_points_obj_publishes_ais_values_only_for_matches_and_never_the_mmsi():
     anch = pd.DataFrame({
         "on_posidonia": [True, True], "month": ["2025-07", "2025-07"],
@@ -148,7 +157,8 @@ def test_points_obj_classifies_on_the_unrounded_values():
         "ais_speed_kn": [0.96, 0.1], "ais_length_m": [33.0, 15.0],
     })
     pts = export.points_obj(anch, ["2025-07"], cap=10)
-    assert pts["ais_speed_kn"] == [1.0, 0.1] and pts["ais_conf"] == [0.95, 0.9]  # rounded past the thresholds
+    assert pts["ais_speed_kn"] == [1.0, 0.1]  # rounded past the threshold
+    assert pts["ais_conf"] == [0.95, 0.89]  # rounded down: stays below the threshold
     assert pts["ais_class"] == [3, 1]
 
 

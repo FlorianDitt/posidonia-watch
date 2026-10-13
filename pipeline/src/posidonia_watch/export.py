@@ -45,6 +45,15 @@ def _num(x, nd: int | None = None):
     return int(x) if nd == 0 else x
 
 
+def _floor(x, nd: int):
+    """Like ``_num``, but rounded down: a value just below a threshold is not published as meeting it.
+
+    The float32 widening error is rounded away first, as in ``analysis._widened`` (0.9 stays 0.9).
+    """
+    x = _num(x)
+    return None if x is None else math.floor(round(x * 10 ** nd, 6 - nd)) / 10 ** nd
+
+
 def write_json(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -128,8 +137,8 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
     # AIS values only for matched detections; the MMSI itself is never written (docs/ais.md)
     matched = on["ais_matched"].to_numpy(dtype=bool)
 
-    def ais(col: str, nd: int) -> list:
-        return [_num(v, nd) if m else None for v, m in zip(on[col], matched)]
+    def ais(col: str, nd: int, num=_num) -> list:
+        return [num(v, nd) if m else None for v, m in zip(on[col], matched)]
 
     return {
         "lon": [round(float(v), nd) for v in on["lon"]],
@@ -140,7 +149,7 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
         # 0 no match, 1 uncertain match, 2 confident, 3 confident and AIS-stationary
         "ais_class": (matched.astype(int) + on["ais_confident"].to_numpy(dtype=int)
                       + on["ais_stationary"].to_numpy(dtype=int)).tolist(),
-        "ais_conf": ais("matching_confidence", 2),
+        "ais_conf": ais("matching_confidence", 2, _floor),  # 0.896 is uncertain and must not read as 0.9
         "ais_speed_kn": ais("ais_speed_kn", 1),
         "ais_length_m": ais("ais_length_m", 1),
         "ais_flag": flag_of(on["mmsi"]).tolist(),
