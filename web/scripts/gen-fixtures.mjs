@@ -75,7 +75,8 @@ for (const r of regions) {
 const rows = [...hexMap.values()];
 
 const points = {
-  lon: [], lat: [], month: [], length_m: [], country: [], ais_conf: [], ais_speed_kn: [], ais_length_m: [], ais_flag: [],
+  lon: [], lat: [], month: [], length_m: [], country: [], ais_class: [], ais_conf: [], ais_speed_kn: [], ais_length_m: [],
+  ais_flag: [],
 };
 // Flag states: mostly the local country, some foreign and open-registry flags
 const LOCAL_FLAG = { ESP: 'ES', FRA: 'FR', ITA: 'IT', HRV: 'HR', GRC: 'GR', TUR: 'TR', MLT: 'MT', CYP: 'CY', MCO: 'MC' };
@@ -91,7 +92,9 @@ const ts = {
   anchored_on_posidonia: months.map(() => 0),
   large_on_posidonia: months.map(() => 0),
   ais_matched_on_posidonia: months.map(() => 0),
+  ais_matched_large_on_posidonia: months.map(() => 0),
   ais_stationary_on_posidonia: months.map(() => 0),
+  ais_stationary_large_on_posidonia: months.map(() => 0),
   by_country: {},
 };
 // Sparse (cell, month) rows plus dense clear overpasses, as in docs/data-contract.md
@@ -145,15 +148,18 @@ for (const [i, row] of rows.entries()) {
     const cm = cellMonth[mi];
     cm[0]++;
     if (isLarge) cm[1]++;
-    if (conf !== null && conf >= AIS_CONF_MIN) {
+    const confident = conf !== null && conf >= AIS_CONF_MIN;
+    const stationary = confident && speed < 1;
+    points.ais_class.push(!matched ? 0 : stationary ? 3 : confident ? 2 : 1);
+    if (confident) {
       ts.ais_matched_on_posidonia[mi]++;
       cm[2]++;
-      if (isLarge) cm[3]++;
-      if (speed < 1) {
-        ts.ais_stationary_on_posidonia[mi]++;
-        cm[4]++;
-        if (isLarge) cm[5]++;
-      }
+      if (isLarge) { ts.ais_matched_large_on_posidonia[mi]++; cm[3]++; }
+    }
+    if (stationary) {
+      ts.ais_stationary_on_posidonia[mi]++;
+      cm[4]++;
+      if (isLarge) { ts.ais_stationary_large_on_posidonia[mi]++; cm[5]++; }
     }
   }
   cellMonth.forEach((cm, mi) => {
