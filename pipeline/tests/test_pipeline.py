@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from posidonia_watch import export, ingest, pipeline
-from posidonia_watch.config import Config
+from posidonia_watch.config import Config, load_config
 from posidonia_watch.zenodo import Release
 
 
@@ -99,6 +99,15 @@ def test_build_input_leaves_out_stale_releases_before_since(tmp_path):
     with pytest.raises(SystemExit, match="202501"):
         _cache(cfg, {"202501": None})
         pipeline._load_cached(cfg, since="2025")
+
+
+def test_load_config_defaults_the_ais_confidence_for_older_configs(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text("params: {speed_kn_max: 1.0}\n")
+    assert load_config(path).params == {"speed_kn_max": 1.0, "ais_confidence_min": 0.9}
+    path.write_text("params: {speed_kn_max: 1.0, ais_confidence_min: 0.8}\n")
+    assert load_config(path).params["ais_confidence_min"] == 0.8
+    assert load_config().params["ais_confidence_min"] == 0.9  # the shipped config
 
 
 def test_num_makes_values_json_safe():
