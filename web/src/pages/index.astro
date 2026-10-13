@@ -109,6 +109,9 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
               <span class="inline-block h-2.5 w-2.5 rounded-full border-2 border-ink bg-surface align-middle"></span>.{' '}
               <a class="underline" href={withBase('about/#ais')}>What AIS shows</a>
             </p>
+            <p id="boats-points-note" hidden role="status" class="text-xs leading-relaxed text-ink-2">
+              The single boats in this release carry no AIS data, so all of them stay on the map.
+            </p>
           </div>
         </details>
 
