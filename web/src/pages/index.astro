@@ -15,14 +15,14 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   </div>
 
   <div id="map-status" class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6" aria-live="polite">
-    <p class="map-light rounded-lg bg-surface/90 px-4 py-3 text-sm text-ink-2 shadow">Loading map…</p>
+    <p class="rounded-lg bg-surface/90 px-4 py-3 text-sm text-ink-2 shadow">Loading map…</p>
   </div>
 
   <aside
     id="panel"
     data-open="false"
     aria-label="Map controls and hotspots"
-    class="panel map-light absolute z-20 flex flex-col overflow-hidden border border-line bg-surface text-sm shadow-[0_6px_20px_rgb(16_35_42/0.14)]
+    class="panel absolute z-20 flex flex-col overflow-hidden border border-line/70 bg-surface/75 text-sm shadow-[0_10px_30px_rgb(0_0_0/0.3)] backdrop-blur-md
       max-sm:inset-x-0 max-sm:bottom-0 max-sm:rounded-t-2xl max-sm:border-b-0
       sm:bottom-4 sm:left-4 sm:max-h-[calc(100%-2rem)] sm:w-[21rem] sm:rounded-2xl"
   >
@@ -151,7 +151,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
 </Base>
 
 <style>
-  /* Selected tab and segment: an ink pill on a tinted track */
+  /* Selected tab and segment: a light pill on a dark track */
   .tabs {
     display: grid;
     flex: 1;
@@ -159,7 +159,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
     gap: 2px;
     padding: 4px;
     border-radius: 9999px;
-    background: var(--surface-2);
+    background: color-mix(in srgb, var(--surface-2) 70%, transparent);
   }
   .tab {
     border-radius: 9999px;
@@ -360,7 +360,7 @@ const years = [...new Set((meta?.months ?? []).map((m) => m.slice(0, 4)))];
   .sec {
     border-radius: 0.875rem;
     padding: 0 1rem;
-    background: var(--surface-2);
+    background: color-mix(in srgb, var(--surface-2) 65%, transparent);
   }
   .sec summary {
     display: flex;
