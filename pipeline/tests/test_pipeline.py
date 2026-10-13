@@ -94,6 +94,7 @@ def test_build_input_refuses_a_stale_annual_release_that_still_supplies_a_month(
 def test_build_input_skips_a_stale_annual_release_superseded_by_monthly_ones(tmp_path):
     cfg = Config(raw={}, base_dir=tmp_path)
     _cache(cfg, {"2025": None, **MONTHS_2025})
+    assert pipeline.stale_releases(cfg) == []
     det, ovp, months, _ = pipeline._load_cached(cfg)
     assert months == [f"2025-{m:02d}" for m in range(1, 13)]
     assert len(det) == 12 and len(ovp) == 12
@@ -104,6 +105,8 @@ def test_build_input_leaves_out_stale_releases_before_since(tmp_path):
     _cache(cfg, {"2023": CURRENT, "2024": None, "202412": None, "202501": CURRENT})
     with pytest.raises(SystemExit, match="2024, 202412"):
         pipeline._load_cached(cfg)
+    assert pipeline.stale_releases(cfg) == ["2024", "202412"]
+    assert pipeline.stale_releases(cfg, since="2025") == []
     _, _, months, _ = pipeline._load_cached(cfg, since="2025")
     assert months == ["2023-01", "2025-01"]  # the current 2023 cache is still used
     with pytest.raises(SystemExit, match="202501"):
