@@ -38,7 +38,8 @@ def _parser() -> argparse.ArgumentParser:
     u.add_argument("--max-releases", type=int, default=None, help="stop after fetching N releases")
     u.add_argument("--max-minutes", type=float, default=None,
                    help="do not start a new download after this many minutes (CI time budget)")
-    u.add_argument("--since", default=None, help="only consider releases from this year on (YYYY)")
+    u.add_argument("--since", default=None,
+                   help="only fetch releases from this year on (YYYY); the build still uses all cached ones")
     u.add_argument("--no-build", action="store_true")
 
     r = sub.add_parser("reference", help="(re)download Posidonia polygons and EEZs")
@@ -104,7 +105,9 @@ def main(argv: list[str] | None = None) -> int:
             except Exception:
                 log.exception("Fetching %s failed; continuing with the others", rel.period)
         if not args.no_build:
-            pipeline.build(cfg, since=args.since)  # same view as the fetch: older stale releases are left out
+            # Not with --since: stale releases before it would be left out of the published data. They stop
+            # the build instead, as with a plain `build`
+            pipeline.build(cfg)
         return 0
     return 1
 
