@@ -17,13 +17,14 @@ _SEASON_OF_MONTH = {12: "DJF", 1: "DJF", 2: "DJF", 3: "MAM", 4: "MAM", 5: "MAM",
                     6: "JJA", 7: "JJA", 8: "JJA", 9: "SON", 10: "SON", 11: "SON"}
 
 
-# monthly total -> the hex_monthly count it is the sum of
-AIS_TOTALS = {
-    "ais_matched_on_posidonia": "ais",
-    "ais_matched_large_on_posidonia": "ais_large",
-    "ais_stationary_on_posidonia": "ais_st",
-    "ais_stationary_large_on_posidonia": "ais_st_large",
-}
+# The AIS counts, as (timeseries.json key, hex_monthly column, hexes_monthly.json key). A monthly total is the sum
+# of its hex_monthly column over the cells
+AIS_COUNTS = (
+    ("ais_matched_on_posidonia", "ais", "ais_on_posidonia"),
+    ("ais_matched_large_on_posidonia", "ais_large", "ais_large_on_posidonia"),
+    ("ais_stationary_on_posidonia", "ais_st", "ais_stationary_on_posidonia"),
+    ("ais_stationary_large_on_posidonia", "ais_st_large", "ais_stationary_large_on_posidonia"),
+)
 
 
 def season_of(month: str) -> str:
@@ -169,8 +170,8 @@ def ais_monthly_totals(rows: pd.DataFrame, months: list[str]) -> pd.DataFrame:
 
     Every detection on Posidonia lies in one of the cells, so these are the Mediterranean-wide totals.
     """
-    sums = rows.groupby("m")[list(AIS_TOTALS.values())].sum().reindex(range(len(months)), fill_value=0)
-    return pd.DataFrame({name: sums[col].to_numpy(dtype=int) for name, col in AIS_TOTALS.items()},
+    sums = rows.groupby("m")[[col for _, col, _ in AIS_COUNTS]].sum().reindex(range(len(months)), fill_value=0)
+    return pd.DataFrame({total: sums[col].to_numpy(dtype=int) for total, col, _ in AIS_COUNTS},
                         index=pd.Index(months, name="month"))
 
 
@@ -260,7 +261,7 @@ def hex_monthly(
         ais=on["ais_confident"], ais_large=on["ais_confident"] & on["large"],
         ais_st=on["ais_stationary"], ais_st_large=on["ais_stationary"] & on["large"],
     )
-    counts = ["large", "ais", "ais_large", "ais_st", "ais_st_large"]
+    counts = ["large", *(col for _, col, _ in AIS_COUNTS)]
     rows = on.groupby(["h3", "month"]).agg(n=("large", "size"), **{c: (c, "sum") for c in counts}).reset_index()
     rows = pd.DataFrame({
         "i": pos.reindex(rows["h3"]).to_numpy(),

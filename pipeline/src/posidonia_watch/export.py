@@ -14,19 +14,12 @@ import numpy as np
 import pandas as pd
 import shapely
 
-from .analysis import SEASONS
+from .analysis import AIS_COUNTS, SEASONS
 from .flags import flag_of
 from .habitat import MED_LAEA
 
 log = logging.getLogger(__name__)
 
-# timeseries.json key -> the hexes_monthly.json array it is the monthly sum of (analysis.ais_monthly_totals)
-AIS_SERIES = {
-    "ais_matched_on_posidonia": "ais_on_posidonia",
-    "ais_matched_large_on_posidonia": "ais_large_on_posidonia",
-    "ais_stationary_on_posidonia": "ais_stationary_on_posidonia",
-    "ais_stationary_large_on_posidonia": "ais_stationary_large_on_posidonia",
-}
 FILES = ("meta.json", "timeseries.json", "hexes.json", "hexes_monthly.json", "points.json", "posidonia.geojson",
          "hotspots.json")
 
@@ -92,7 +85,7 @@ def timeseries_obj(totals: pd.DataFrame, by_country: dict, names: dict[str, str]
         "anchored_total": [int(v) for v in t["anchored_total"]],
         "anchored_on_posidonia": [int(v) for v in t["anchored_on_posidonia"]],
         "large_on_posidonia": [int(v) for v in t["large_on_posidonia"]],
-        **{k: [int(v) for v in t[k]] for k in AIS_SERIES},
+        **{total: [int(v) for v in t[total]] for total, _, _ in AIS_COUNTS},
         "by_country": {
             iso: {"name": names.get(iso, iso), **series}
             for iso, series in sorted(by_country.items(), key=lambda kv: -sum(kv[1]["anchored_on_posidonia"]))
@@ -122,10 +115,7 @@ def hexes_monthly_obj(rows: pd.DataFrame, clear: np.ndarray, months: list[str]) 
         "month": [int(v) for v in rows["m"]],
         "on_posidonia": [int(v) for v in rows["n"]],
         "large_on_posidonia": [int(v) for v in rows["large"]],
-        "ais_on_posidonia": [int(v) for v in rows["ais"]],
-        "ais_large_on_posidonia": [int(v) for v in rows["ais_large"]],
-        "ais_stationary_on_posidonia": [int(v) for v in rows["ais_st"]],
-        "ais_stationary_large_on_posidonia": [int(v) for v in rows["ais_st_large"]],
+        **{key: [int(v) for v in rows[col]] for _, col, key in AIS_COUNTS},
         "clear_overpasses": [int(v) for v in clear.reshape(-1)],
     }
 
@@ -277,7 +267,7 @@ def validate_outputs(out_dir: Path) -> None:
 
     ts = json.loads((out_dir / "timeseries.json").read_text())
     _check(ts["months"] == months, "timeseries.months != meta.months")
-    for k in ("anchored_total", "anchored_on_posidonia", "large_on_posidonia", *AIS_SERIES):
+    for k in ("anchored_total", "anchored_on_posidonia", "large_on_posidonia", *(total for total, _, _ in AIS_COUNTS)):
         _check(len(ts[k]) == n and all(isinstance(v, int) for v in ts[k]), f"timeseries.{k}")
     for iso, c in ts["by_country"].items():
         _check(len(iso) == 3 and "name" in c, f"by_country.{iso}")
@@ -300,7 +290,7 @@ def validate_outputs(out_dir: Path) -> None:
     hm = json.loads((out_dir / "hexes_monthly.json").read_text())
     _check(hm["months"] == months, "hexes_monthly.months != meta.months")
     r = len(hm["cell"])
-    for k in ("month", "on_posidonia", "large_on_posidonia", *AIS_SERIES.values()):
+    for k in ("month", "on_posidonia", "large_on_posidonia", *(key for _, _, key in AIS_COUNTS)):
         _check(len(hm[k]) == r, f"hexes_monthly.{k} length")
     _check_ais_nesting(hm)
     _check(all(0 <= i < m for i in hm["cell"]), "hexes_monthly.cell index out of range")
