@@ -188,6 +188,26 @@ def releases_for_months(releases: dict[str, zenodo.Release], months: list[str]) 
 # --------------------------------------------------------------------------- #
 # Build
 # --------------------------------------------------------------------------- #
+def _cached_periods(cfg: Config, since: str | None = None) -> tuple[list[str], set[str], set[str], set[str]]:
+    """Cached periods to build from, the months with a monthly release among them, and the cached periods that
+    are stale (cached under an older detection schema) and still needed, or stale and before ``since``."""
+    p = _paths(cfg)
+    manifest = load_manifest(cfg)
+    periods = sorted(k for k in manifest if (p["detections"] / f"{k}.parquet").exists()
+                     and (p["overpass"] / f"{k}.parquet").exists())
+    stale = {k for k in periods if manifest[k].get("detections_schema", 1) != ingest.DETECTION_SCHEMA_VERSION}
+    excluded = {k for k in stale if since is not None and k[:4] < since}
+    monthly_months = {f"{k[:4]}-{k[4:]}" for k in periods if len(k) == 6 and k not in excluded}
+    unused = {k for k in stale - excluded if superseded(k, monthly_months)}
+    periods = [k for k in periods if k not in excluded | unused]
+    return periods, monthly_months, stale - excluded - unused, excluded
+
+
+def stale_releases(cfg: Config, since: str | None = None) -> list[str]:
+    """Cached releases that stop the build until they are fetched again (see ``_load_cached``)."""
+    return sorted(_cached_periods(cfg, since)[2])
+
+
 def _load_cached(cfg: Config, since: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame, list[str], dict]:
     """Concatenate cached detections / overpasses. Monthly releases win over annual ones.
 
@@ -197,20 +217,13 @@ def _load_cached(cfg: Config, since: str | None = None) -> tuple[pd.DataFrame, p
     """
     p = _paths(cfg)
     manifest = load_manifest(cfg)
-    periods = sorted(k for k in manifest if (p["detections"] / f"{k}.parquet").exists()
-                     and (p["overpass"] / f"{k}.parquet").exists())
-    stale = {k for k in periods if manifest[k].get("detections_schema", 1) != ingest.DETECTION_SCHEMA_VERSION}
-    excluded = {k for k in stale if since is not None and k[:4] < since}
-    monthly_months = {f"{k[:4]}-{k[4:]}" for k in periods if len(k) == 6 and k not in excluded}
-    unused = {k for k in stale - excluded if superseded(k, monthly_months)}
-    stale -= excluded | unused
+    periods, monthly_months, stale, excluded = _cached_periods(cfg, since)
     if stale:  # their missing columns would read as "no AIS match" and publish zero AIS counts for those months
         raise SystemExit(f"Releases cached under an older detection schema: {', '.join(sorted(stale))}. "
                          "Run `posidonia-watch update --no-build` (or `fetch --months ...`) to fetch them again.")
     if excluded:
         log.warning("Leaving out releases before %s cached under an older detection schema: %s",
                     since, ", ".join(sorted(excluded)))
-    periods = [k for k in periods if k not in excluded | unused]
     dets, ovps = [], []
     for k in periods:
         d = pd.read_parquet(p["detections"] / f"{k}.parquet")

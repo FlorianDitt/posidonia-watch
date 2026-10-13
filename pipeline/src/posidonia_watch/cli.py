@@ -1,4 +1,4 @@
-"""Command line interface: ``posidonia-watch {discover,fetch,build,update,reference}``."""
+"""Command line interface: ``posidonia-watch {discover,fetch,build,stale,update,reference}``."""
 
 from __future__ import annotations
 
@@ -29,6 +29,10 @@ def _parser() -> argparse.ArgumentParser:
     b = sub.add_parser("build", help="aggregate everything cached -> web/public/data")
     b.add_argument("--since", default=None,
                    help="leave out releases before this year (YYYY) that are cached under an older detection schema")
+
+    s = sub.add_parser("stale", help="list the cached releases that stop `build` until they are fetched again "
+                                     "(cached under an older detection schema), one per line")
+    s.add_argument("--since", default=None, help="as for `build`")
 
     u = sub.add_parser("update", help="fetch releases not cached yet (newest first), then build")
     u.add_argument("--max-releases", type=int, default=None, help="stop after fetching N releases")
@@ -73,6 +77,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "build":
         pipeline.build(cfg, since=args.since)
+        return 0
+
+    if args.cmd == "stale":
+        print("\n".join(pipeline.stale_releases(cfg, since=args.since)), end="")
         return 0
 
     if args.cmd == "update":
