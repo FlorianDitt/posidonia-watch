@@ -27,8 +27,10 @@ JSON is minified, UTF-8.
   params.ais_confidence_min` (default 0.9). The AIS speed of a match is the
   mean of `ais_speed_kn_before` and `ais_speed_kn_after`. **AIS-stationary**:
   a confident match whose AIS speed is known and below `params.speed_kn_max`,
-  i.e. the boat's own AIS confirms it was anchored. The MMSI is never
-  published; see `docs/ais.md`.
+  i.e. the boat's own AIS confirms it was anchored. **AIS-moving**: a
+  confident match whose AIS speed is known and not below it. A confident
+  match without an AIS speed is neither. The MMSI is never published; see
+  `docs/ais.md`.
 - **Density**: `on_posidonia / clear_overpasses` = average number of boats
   anchored on Posidonia in that cell at the moment of a clear image.
   `null` when `clear_overpasses == 0`.
@@ -65,6 +67,7 @@ Mediterranean-wide totals per month, same order as `meta.months`.
   "ais_matched_large_on_posidonia":    [0, 0],
   "ais_stationary_on_posidonia":       [0, 0],
   "ais_stationary_large_on_posidonia": [0, 0],
+  "ais_moving_on_posidonia":           [0, 0],
   "by_country": {
     "FRA": { "name": "France", "anchored_on_posidonia": [0, 0], "large_on_posidonia": [0, 0] }
   }
@@ -77,6 +80,9 @@ those. Their ratio is how often the image-based "anchored" agrees with what
 the boat reported (matches without AIS speed count as not confirmed). The
 `*_large_*` arrays count the large boats among them. Each of the four equals
 the sum of its `hexes_monthly.json` counterpart over the cells of that month.
+`ais_moving_on_posidonia` counts the AIS-moving part of the confident
+matches. It has no per-cell counterpart. Per month, stationary plus moving
+is at most `ais_matched_on_posidonia`; the rest reported no AIS speed.
 
 `by_country` is keyed by ISO3 of the EEZ the detection falls in (Marine
 Regions). Key `"UNK"` for detections outside any EEZ or if EEZ lookup is
