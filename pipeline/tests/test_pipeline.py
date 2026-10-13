@@ -50,6 +50,16 @@ def test_is_cached_refetches_releases_cached_under_an_older_schema(tmp_path):
     assert not pipeline.is_cached(cfg, rel, legacy)
 
 
+def test_releases_to_fetch_skips_an_annual_release_superseded_by_monthly_ones(tmp_path):
+    cfg = Config(raw={}, base_dir=tmp_path)
+    year = {p: _release(p) for p in ("2024", "2025", *(f"2025{m:02d}" for m in range(1, 13)))}
+    todo = [r.period for r in pipeline.releases_to_fetch(cfg, year, {})]
+    assert todo == [*(f"2025{m:02d}" for m in range(12, 0, -1)), "2024"]  # newest first, no annual 2025
+    del year["202507"]  # the annual file is the only source for July
+    assert [r.period for r in pipeline.releases_to_fetch(cfg, year, {})][-2:] == ["2025", "2024"]
+    assert "2024" not in [r.period for r in pipeline.releases_to_fetch(cfg, year, {}, since="2025")]
+
+
 def _cache(cfg: Config, schemas: dict[str, int | None]) -> None:
     """Cache one detection and one overpass row per period (first month of an annual one)."""
     manifest = {}

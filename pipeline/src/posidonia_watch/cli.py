@@ -80,12 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         _, _, cells = pipeline.ensure_reference(cfg)
         releases = pipeline.discover(cfg)
         manifest = pipeline.load_manifest(cfg)
-        # A month covered by a monthly release does not need its annual file,
-        # but annual files are the only source for 2019-2024.
-        todo = [r for r in releases.values()
-                if not pipeline.is_cached(cfg, r, manifest)
-                and (args.since is None or r.period[:4] >= args.since)]
-        todo.sort(key=lambda r: r.period, reverse=True)  # newest first
+        todo = pipeline.releases_to_fetch(cfg, releases, manifest, args.since)
         log.info("%d release(s) to fetch: %s", len(todo), ", ".join(r.period for r in todo) or "none")
         fetched = 0
         for rel in todo:

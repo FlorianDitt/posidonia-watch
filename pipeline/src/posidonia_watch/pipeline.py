@@ -153,6 +153,21 @@ def _cached_overpass_cells(cfg: Config) -> list[str]:
     return json.loads(p.read_text()) if p.exists() else []
 
 
+def superseded(period: str, monthly_months: set[str]) -> bool:
+    """An annual release whose twelve months are all in ``monthly_months``: nothing is read from it."""
+    return len(period) == 4 and all(f"{period}-{m:02d}" in monthly_months for m in range(1, 13))
+
+
+def releases_to_fetch(cfg: Config, releases: dict[str, zenodo.Release], manifest: dict,
+                      since: str | None = None) -> list[zenodo.Release]:
+    """Releases `update` has to download, newest first: not cached, from ``since`` on, and not an annual file
+    whose months all have a monthly release (annual files are the only source for 2019-2024)."""
+    wanted = [r for r in releases.values() if since is None or r.period[:4] >= since]
+    monthly_months = {m for r in wanted if len(r.period) == 6 for m in r.months}
+    todo = [r for r in wanted if not is_cached(cfg, r, manifest) and not superseded(r.period, monthly_months)]
+    return sorted(todo, key=lambda r: r.period, reverse=True)
+
+
 def releases_for_months(releases: dict[str, zenodo.Release], months: list[str]) -> list[zenodo.Release]:
     """Map 'YYYY-MM' (or 'YYYY') requests to releases, preferring monthly ones."""
     out: dict[str, zenodo.Release] = {}
@@ -187,8 +202,7 @@ def _load_cached(cfg: Config, since: str | None = None) -> tuple[pd.DataFrame, p
     stale = {k for k in periods if manifest[k].get("detections_schema", 1) != ingest.DETECTION_SCHEMA_VERSION}
     excluded = {k for k in stale if since is not None and k[:4] < since}
     monthly_months = {f"{k[:4]}-{k[4:]}" for k in periods if len(k) == 6 and k not in excluded}
-    unused = {k for k in stale - excluded
-              if len(k) == 4 and all(f"{k}-{m:02d}" in monthly_months for m in range(1, 13))}
+    unused = {k for k in stale - excluded if superseded(k, monthly_months)}
     stale -= excluded | unused
     if stale:  # their missing columns would read as "no AIS match" and publish zero AIS counts for those months
         raise SystemExit(f"Releases cached under an older detection schema: {', '.join(sorted(stale))}. "
