@@ -134,11 +134,13 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
     on = anch[anch["on_posidonia"] & anch["month"].isin(months)]
     on = on.sort_values("detect_timestamp", ascending=False).head(cap)
     midx = {m: i for i, m in enumerate(months)}
-    # AIS values only for matched detections; the MMSI itself is never written (docs/ais.md)
+    # The confidence for every match, the vessel's speed, length and flag only for confident ones: an uncertain
+    # match may be another boat. The MMSI itself is never written (docs/ais.md)
     matched = on["ais_matched"].to_numpy(dtype=bool)
+    confident = on["ais_confident"].to_numpy(dtype=bool)
 
-    def ais(col: str, nd: int, num=_num) -> list:
-        return [num(v, nd) if m else None for v, m in zip(on[col], matched)]
+    def ais(col: str, nd: int, keep=confident, num=_num) -> list:
+        return [num(v, nd) if k else None for v, k in zip(on[col], keep)]
 
     return {
         "lon": [round(float(v), nd) for v in on["lon"]],
@@ -147,12 +149,12 @@ def points_obj(anch: pd.DataFrame, months: list[str], cap: int, nd: int = 5) -> 
         "length_m": [_num(v, 1) for v in on["length_m_inferred"]],
         "country": on["country"].tolist(),
         # 0 no match, 1 uncertain match, 2 confident, 3 confident and AIS-stationary
-        "ais_class": (matched.astype(int) + on["ais_confident"].to_numpy(dtype=int)
+        "ais_class": (matched.astype(int) + confident.astype(int)
                       + on["ais_stationary"].to_numpy(dtype=int)).tolist(),
-        "ais_conf": ais("matching_confidence", 2, _floor),  # 0.896 is uncertain and must not read as 0.9
+        "ais_conf": ais("matching_confidence", 2, matched, _floor),  # 0.896 is uncertain and must not read as 0.9
         "ais_speed_kn": ais("ais_speed_kn", 1),
         "ais_length_m": ais("ais_length_m", 1),
-        "ais_flag": flag_of(on["mmsi"]).tolist(),
+        "ais_flag": [f if k else None for f, k in zip(flag_of(on["mmsi"]), confident)],
     }
 
 
@@ -244,13 +246,16 @@ def _check_ais_nesting(hm: dict) -> None:
 
 
 def _check_points_ais(pts: dict) -> None:
-    """Class 0 publishes no AIS value; a confident match (class >= 2) always has its confidence."""
+    """No confidence without a match (class 0), always one for a confident match (class >= 2), and the vessel's
+    speed, length and flag only for a confident match."""
     _check(all(c in (0, 1, 2, 3) for c in pts["ais_class"]), "points.ais_class values")
-    for k in ("ais_conf", "ais_speed_kn", "ais_length_m", "ais_flag"):
-        _check(all(v is None for c, v in zip(pts["ais_class"], pts[k]) if c == 0),
-               f"points.{k} must be null without a match")
+    _check(all(v is None for c, v in zip(pts["ais_class"], pts["ais_conf"]) if c == 0),
+           "points.ais_conf must be null without a match")
     _check(all(v is not None for c, v in zip(pts["ais_class"], pts["ais_conf"]) if c >= 2),
            "points.ais_conf must be set for a confident match")
+    for k in ("ais_speed_kn", "ais_length_m", "ais_flag"):
+        _check(all(v is None for c, v in zip(pts["ais_class"], pts[k]) if c < 2),
+               f"points.{k} must be null without a confident match")
 
 
 def validate_outputs(out_dir: Path) -> None:

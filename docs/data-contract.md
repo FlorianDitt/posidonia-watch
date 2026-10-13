@@ -173,11 +173,12 @@ thresholds.
 match below the threshold never shows the threshold), `null` without a match
 or when GFW gives the match no confidence (such a match is class `1`).
 `ais_speed_kn` (1 decimal) and `ais_length_m` (1 decimal) come from the
-matched vessel's AIS messages, `null` without a match or when AIS lacks them.
-`ais_flag` is the ISO 3166-1 alpha-2 flag state from the matched MMSI's first
-three digits (its MID), `null` without a match or for an unknown MID. The
-`ais_conf`, `ais_speed_kn`, `ais_length_m` and `ais_flag` values are published
-for every match, also the uncertain ones.
+matched vessel's AIS messages, `null` without a confident match or when AIS
+lacks them. `ais_flag` is the ISO 3166-1 alpha-2 flag state from the matched
+MMSI's first three digits (its MID), `null` without a confident match or for
+an unknown MID. `ais_conf` is published for every match; `ais_speed_kn`,
+`ais_length_m` and `ais_flag` only for confident ones (class `2` and `3`),
+because an uncertain match may belong to another boat.
 
 ## `posidonia.geojson`
 

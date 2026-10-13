@@ -157,7 +157,7 @@ def test_points_obj_classifies_on_the_unrounded_values():
         "ais_speed_kn": [0.96, 0.1], "ais_length_m": [33.0, 15.0],
     })
     pts = export.points_obj(anch, ["2025-07"], cap=10)
-    assert pts["ais_speed_kn"] == [1.0, 0.1]  # rounded past the threshold
+    assert pts["ais_speed_kn"] == [1.0, None]  # rounded past the threshold
     assert pts["ais_conf"] == [0.95, 0.89]  # rounded down: stays below the threshold
     assert pts["ais_class"] == [3, 1]
 
@@ -173,16 +173,33 @@ def test_points_obj_keeps_a_match_without_confidence_as_uncertain():
     pts = export.points_obj(anch, ["2025-07"], cap=10)
     assert pts["ais_class"] == [1]
     assert pts["ais_conf"] == [None]
-    assert pts["ais_flag"] == ["FR"]
     export._check_points_ais(pts)
 
 
-def test_points_ais_check_rejects_values_on_unmatched_points_and_confident_matches_without_confidence():
-    base = {"ais_speed_kn": [None], "ais_length_m": [None], "ais_flag": [None]}
-    with pytest.raises(export.ContractError):
-        export._check_points_ais({"ais_class": [0], "ais_conf": [0.5], **base})
-    with pytest.raises(export.ContractError):
-        export._check_points_ais({"ais_class": [2], "ais_conf": [None], **base})
+def test_points_obj_publishes_only_the_confidence_of_an_uncertain_match():
+    anch = pd.DataFrame({
+        "on_posidonia": [True], "month": ["2025-07"], "detect_timestamp": ["2025-07-02"],
+        "lon": [3.0], "lat": [42.0], "length_m_inferred": [30.0], "country": ["FRA"], "mmsi": ["227000009"],
+        "ais_matched": [True], "matching_confidence": [0.5],
+        "ais_confident": [False], "ais_stationary": [False],
+        "ais_speed_kn": [0.1], "ais_length_m": [33.0],
+    })
+    pts = export.points_obj(anch, ["2025-07"], cap=10)
+    assert (pts["ais_class"], pts["ais_conf"]) == ([1], [0.5])
+    assert (pts["ais_speed_kn"], pts["ais_length_m"], pts["ais_flag"]) == ([None], [None], [None])
+    export._check_points_ais(pts)
+
+
+def test_points_ais_check_rejects_values_the_class_does_not_publish():
+    base = {"ais_conf": [0.5], "ais_speed_kn": [None], "ais_length_m": [None], "ais_flag": [None]}
+    export._check_points_ais({"ais_class": [1], **base})
+    with pytest.raises(export.ContractError):  # a confidence without a match
+        export._check_points_ais({"ais_class": [0], **base})
+    with pytest.raises(export.ContractError):  # a confident match without its confidence
+        export._check_points_ais({"ais_class": [2], **base, "ais_conf": [None]})
+    for key, value in (("ais_speed_kn", 0.1), ("ais_length_m", 33.0), ("ais_flag", "FR")):
+        with pytest.raises(export.ContractError):  # a vessel value on an uncertain match
+            export._check_points_ais({"ais_class": [1], **base, key: [value]})
 
 
 def test_ais_nesting_check_covers_the_large_counts():
