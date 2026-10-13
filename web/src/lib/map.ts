@@ -47,15 +47,34 @@ async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
     const res = await fetch(STYLE_URL, { signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as maplibregl.StyleSpecification;
+    return calmBasemap((await res.json()) as maplibregl.StyleSpecification);
   } catch (e) {
     console.warn('Basemap unavailable, using plain background', e);
     return {
       version: 8,
       sources: {},
-      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#dfe8ea' } }],
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': BASEMAP.water } }],
     };
   }
+}
+
+/** Basemap colors replacing liberty's saturated periwinkle water and green-brown relief, so the orange hexagons
+ *  stand out against a muted sea and a neutral land. */
+const BASEMAP = { land: '#f3f0ea', water: '#b4d0e1', waterLabel: '#3d6680' };
+
+function calmBasemap(style: maplibregl.StyleSpecification): maplibregl.StyleSpecification {
+  for (const l of style.layers) {
+    const paint = ((l as { paint?: Record<string, unknown> }).paint ??= {});
+    if (l.id === 'background') paint['background-color'] = BASEMAP.land;
+    else if (l.id === 'water') paint['fill-color'] = BASEMAP.water;
+    else if (l.id.startsWith('waterway') && l.type === 'line') paint['line-color'] = BASEMAP.water;
+    else if (l.id.startsWith('water_name')) paint['text-color'] = BASEMAP.waterLabel;
+    else if (l.type === 'raster') {
+      paint['raster-saturation'] = -0.6;
+      paint['raster-opacity'] = ['interpolate', ['linear'], ['zoom'], 0, 0.3, 6, 0.05];
+    }
+  }
+  return style;
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
