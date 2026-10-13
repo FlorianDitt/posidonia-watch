@@ -23,17 +23,34 @@
   --grid: #232e45;
 
   /* Sequential pressure ramp for the hex map (low -> high) */
-  --ramp-0: #f49a4c;
-  --ramp-1: #e97a33;
-  --ramp-2: #d45a1a;
-  --ramp-3: #b04212;
-  --ramp-4: #82300d;
+  /* lightest step stays >= 3:1 on the basemap land; dots also get a white halo (map.ts) */
+  --ramp-0: #d9661c;
+  --ramp-1: #c95a14;
+  --ramp-2: #a8410f;
+  --ramp-3: #7f2c0a;
+  --ramp-4: #55200a;
   --hex-line: rgba(110, 34, 5, 0.35);
   --map-seagrass: #2e7d55;
   --map-ink: #10232a;
   --map-halo: #ffffff;
   --point-small: #1b5e7a;
   --point-large: #c0265e;
+}
+
+/* Light chrome for controls floating over the pale basemap: a navy slab there was the loudest thing
+   on screen (~15:1 against the land) while the ramp's dark end sank into it. Text stays >= 4.5:1. */
+.map-light {
+  color-scheme: light;
+  --bg: #ece8e0;
+  --surface: #fbfaf7;
+  --surface-2: #f3f0ea;
+  --ink: #10232a;
+  --ink-2: #34424f;
+  --muted: #5a6878;
+  --line: #d6d0c5;
+  --sea: #1b5e7a;
+  --focus: #1b5e7a;
+  color: var(--ink);
 }
 
 @theme inline {
