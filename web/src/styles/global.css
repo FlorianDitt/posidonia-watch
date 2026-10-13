@@ -23,12 +23,12 @@
   --grid: #232e45;
 
   /* Sequential pressure ramp for the hex map (low -> high) */
-  --ramp-0: #f8a161;
-  --ramp-1: #ee7b33;
-  --ramp-2: #d45a12;
-  --ramp-3: #a63c0f;
-  --ramp-4: #6e2205;
-  --hex-line: rgba(110, 34, 5, 0.35);
+  --ramp-0: #f59440;
+  --ramp-1: #e46a22;
+  --ramp-2: #c24a12;
+  --ramp-3: #8e300c;
+  --ramp-4: #5a1a06;
+  --hex-line: rgba(80, 22, 4, 0.55);
   --map-seagrass: #2e7d55;
   --map-ink: #10232a;
   --map-halo: #ffffff;

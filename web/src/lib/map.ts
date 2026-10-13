@@ -334,7 +334,7 @@ function dotPaint() {
     'circle-color': fillColorExpr(),
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, ['case', positive, 3, 1.5], DOTS_MAXZOOM, ['case', positive, 6, 3]],
     'circle-stroke-color': cssVar('--hex-line'),
-    'circle-stroke-width': 0.5,
+    'circle-stroke-width': 1,
     'circle-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
     'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
   } as unknown as NonNullable<maplibregl.CircleLayerSpecification['paint']>;
@@ -541,7 +541,7 @@ export async function initMap() {
           'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], cssVar('--map-ink'), cssVar('--hex-line')],
           'line-width': ['interpolate', ['linear'], ['zoom'],
             5, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0],
-            8, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0.5],
+            8, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0.8],
             12, ['case', ['boolean', ['feature-state', 'hover'], false], 2.5, 1]],
         },
         layout: { visibility: state.showHexes ? 'visible' : 'none' },
