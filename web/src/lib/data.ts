@@ -86,6 +86,7 @@ export interface Points {
   ais_class?: number[];
   /** AIS match confidence (rounded, for display), null without a match or when the match has no confidence (class 1). */
   ais_conf?: (number | null)[];
+  /** Speed, length and flag are only used for confident matches (class 2 and 3) and may be null for the others. */
   ais_speed_kn?: (number | null)[];
   ais_length_m?: (number | null)[];
   /** ISO2 flag state of the matched vessel. */
