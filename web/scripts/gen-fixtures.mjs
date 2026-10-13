@@ -138,14 +138,17 @@ for (const [i, row] of rows.entries()) {
     const conf = matched ? round(aisRand() < 0.55 ? 0.9 + aisRand() * 0.1 : aisRand() * 0.9, 2) : null;
     const u = aisRand();
     const speed = matched ? round(u < 0.6 ? aisRand() * 0.6 : u < 0.75 ? 1 + aisRand() * 4 : 5 + aisRand() * 6, 1) : null;
+    const aisLen = matched ? round(len * (0.85 + aisRand() * 0.3), 1) : null;
+    const flag = matched ? (aisRand() < 0.7 ? LOCAL_FLAG[row.country] ?? 'MT' : OTHER_FLAGS[Math.floor(aisRand() * OTHER_FLAGS.length)]) : null;
+    const confident = conf !== null && conf >= AIS_CONF_MIN;
+    // Like the pipeline: an uncertain match publishes its confidence only
     points.ais_conf.push(conf);
-    points.ais_speed_kn.push(speed);
-    points.ais_length_m.push(matched ? round(len * (0.85 + aisRand() * 0.3), 1) : null);
-    points.ais_flag.push(matched ? (aisRand() < 0.7 ? LOCAL_FLAG[row.country] ?? 'MT' : OTHER_FLAGS[Math.floor(aisRand() * OTHER_FLAGS.length)]) : null);
+    points.ais_speed_kn.push(confident ? speed : null);
+    points.ais_length_m.push(confident ? aisLen : null);
+    points.ais_flag.push(confident ? flag : null);
     const cm = cellMonth[mi];
     cm[0]++;
     if (isLarge) cm[1]++;
-    const confident = conf !== null && conf >= AIS_CONF_MIN;
     const stationary = confident && speed < 1;
     points.ais_class.push(!matched ? 0 : stationary ? 3 : confident ? 2 : 1);
     if (confident) {
