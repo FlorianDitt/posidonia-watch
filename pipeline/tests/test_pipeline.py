@@ -76,11 +76,27 @@ def test_points_obj_publishes_ais_values_only_for_matches_and_never_the_mmsi():
         "detect_timestamp": ["2025-07-02", "2025-07-01"], "lon": [3.0, 3.1], "lat": [42.0, 42.1],
         "length_m_inferred": [30.0, 12.0], "country": ["FRA", "FRA"], "mmsi": ["227000000", None],
         "ais_matched": [True, False], "matching_confidence": [0.971, 0.4],
+        "ais_confident": [True, False], "ais_stationary": [True, False],
         "ais_speed_kn": [0.24, np.nan], "ais_length_m": [33.0, 15.0],
     })
     pts = export.points_obj(anch, ["2025-07"], cap=10)
     assert "mmsi" not in pts
+    assert pts["ais_class"] == [3, 0]
     assert pts["ais_conf"] == [0.97, None]
     assert pts["ais_speed_kn"] == [0.2, None]
     assert pts["ais_length_m"] == [33.0, None]
     assert pts["ais_flag"] == ["FR", None]
+
+
+def test_points_obj_classifies_on_the_unrounded_values():
+    anch = pd.DataFrame({
+        "on_posidonia": [True, True], "month": ["2025-07", "2025-07"],
+        "detect_timestamp": ["2025-07-02", "2025-07-01"], "lon": [3.0, 3.1], "lat": [42.0, 42.1],
+        "length_m_inferred": [30.0, 12.0], "country": ["FRA", "FRA"], "mmsi": ["227000000", "227000001"],
+        "ais_matched": [True, True], "matching_confidence": [0.95, 0.896],
+        "ais_confident": [True, False], "ais_stationary": [True, False],
+        "ais_speed_kn": [0.96, 0.1], "ais_length_m": [33.0, 15.0],
+    })
+    pts = export.points_obj(anch, ["2025-07"], cap=10)
+    assert pts["ais_speed_kn"] == [1.0, 0.1] and pts["ais_conf"] == [0.95, 0.9]  # rounded past the thresholds
+    assert pts["ais_class"] == [3, 1]
