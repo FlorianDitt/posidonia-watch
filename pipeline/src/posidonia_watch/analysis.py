@@ -17,6 +17,15 @@ _SEASON_OF_MONTH = {12: "DJF", 1: "DJF", 2: "DJF", 3: "MAM", 4: "MAM", 5: "MAM",
                     6: "JJA", 7: "JJA", 8: "JJA", 9: "SON", 10: "SON", 11: "SON"}
 
 
+# monthly total -> the hex_monthly count it is the sum of
+AIS_TOTALS = {
+    "ais_matched_on_posidonia": "ais",
+    "ais_matched_large_on_posidonia": "ais_large",
+    "ais_stationary_on_posidonia": "ais_st",
+    "ais_stationary_large_on_posidonia": "ais_st_large",
+}
+
+
 def season_of(month: str) -> str:
     """'2025-07' -> 'JJA'."""
     return _SEASON_OF_MONTH[int(month[5:7])]
@@ -144,7 +153,7 @@ def classify(
 
 
 def monthly_totals(anch: pd.DataFrame, months: list[str]) -> pd.DataFrame:
-    """Per month: anchored_total, anchored_on_posidonia, large_on_posidonia and the AIS check counts."""
+    """Per month: anchored_total, anchored_on_posidonia, large_on_posidonia."""
     g = anch.groupby("month")
     out = pd.DataFrame(index=pd.Index(months, name="month"))
     out["anchored_total"] = g.size()
@@ -152,11 +161,17 @@ def monthly_totals(anch: pd.DataFrame, months: list[str]) -> pd.DataFrame:
     out["large_on_posidonia"] = (
         g.apply(lambda x: int((x["on_posidonia"] & x["large"]).sum()), include_groups=False) if len(anch) else 0
     )
-    on = anch[anch["on_posidonia"]]
-    for name, col in (("ais_matched", "ais_confident"), ("ais_stationary", "ais_stationary")):
-        out[f"{name}_on_posidonia"] = on.groupby("month")[col].sum()
-        out[f"{name}_large_on_posidonia"] = on[on["large"]].groupby("month")[col].sum()
     return out.fillna(0).astype(int)
+
+
+def ais_monthly_totals(rows: pd.DataFrame, months: list[str]) -> pd.DataFrame:
+    """Per month: the AIS counts of ``hex_monthly`` summed over the cells.
+
+    Every detection on Posidonia lies in one of the cells, so these are the Mediterranean-wide totals.
+    """
+    sums = rows.groupby("m")[list(AIS_TOTALS.values())].sum().reindex(range(len(months)), fill_value=0)
+    return pd.DataFrame({name: sums[col].to_numpy(dtype=int) for name, col in AIS_TOTALS.items()},
+                        index=pd.Index(months, name="month"))
 
 
 def country_series(anch: pd.DataFrame, months: list[str]) -> dict[str, dict[str, list[int]]]:

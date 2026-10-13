@@ -136,12 +136,18 @@ def test_hex_monthly_counts_ais_matches_per_cell_and_month():
     assert clear.tolist() == [[3]]
 
 
-def test_monthly_totals_count_ais_matches_on_posidonia_all_and_large():
+def test_ais_monthly_totals_sum_the_hex_monthly_counts_over_the_cells():
     anch = pd.DataFrame({
-        "month": ["2025-07"] * 4, "on_posidonia": [True, True, True, False], "large": [True, False, True, True],
-        "ais_confident": [True, True, False, True], "ais_stationary": [True, False, False, True],
+        "on_posidonia": [True, True, True, True, False], "month": ["2025-07"] * 5, "h3": ["a", "a", "b", "b", None],
+        "large": [True, False, True, False, True], "ais_confident": [True, True, False, True, True],
+        "ais_stationary": [True, False, False, True, True],
     })
-    t = analysis.monthly_totals(anch, ["2025-06", "2025-07"]).loc["2025-07"]
-    assert (t.ais_matched_on_posidonia, t.ais_matched_large_on_posidonia) == (2, 1)
-    assert (t.ais_stationary_on_posidonia, t.ais_stationary_large_on_posidonia) == (1, 1)
-    assert analysis.monthly_totals(anch, ["2025-06", "2025-07"]).loc["2025-06"].sum() == 0
+    ovp = pd.DataFrame({"h3_id": ["a"], "month": ["2025-07"], "overpasses_cloud_under_20": [3]})
+    months = ["2025-06", "2025-07"]
+    rows, _ = analysis.hex_monthly(anch, ["a", "b"], ovp, months)
+    totals = analysis.ais_monthly_totals(rows, months)
+    assert totals.index.tolist() == months
+    t = totals.loc["2025-07"]
+    assert (t.ais_matched_on_posidonia, t.ais_matched_large_on_posidonia) == (3, 1)
+    assert (t.ais_stationary_on_posidonia, t.ais_stationary_large_on_posidonia) == (2, 1)
+    assert totals.loc["2025-06"].sum() == 0
