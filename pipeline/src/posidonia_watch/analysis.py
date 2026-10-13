@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 import shapely
 
-from .flags import flag_of
 from .habitat import MED_LAEA
 
 SEASONS = ("DJF", "MAM", "JJA", "SON")
@@ -70,7 +69,7 @@ def _widened(col: pd.Series) -> np.ndarray:
 
 
 def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
-    """AIS view of each detection: matched, flag, reported speed, confident, and AIS-confirmed stationary.
+    """AIS view of each detection: matched, reported speed, confident, and AIS-confirmed stationary.
 
     ``ais_speed_kn`` is the mean of the speeds reported just before and after the image (NaN unless both
     exist). ``ais_confident`` is a match with ``matching_confidence >= ais_confidence_min``, and
@@ -83,7 +82,6 @@ def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     confident = matched & (conf >= params["ais_confidence_min"])
     return pd.DataFrame({
         "ais_matched": matched,
-        "ais_flag": pd.Series(np.where(matched, flag_of(mmsi), None), index=df.index, dtype=object),
         "ais_speed_kn": np.where(matched, speed, np.nan),
         "ais_confident": confident,
         "ais_stationary": confident & (speed < params["speed_kn_max"]),  # NaN speed compares False
