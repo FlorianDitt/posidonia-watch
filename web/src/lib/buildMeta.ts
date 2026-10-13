@@ -20,10 +20,23 @@ export function readMeta(): Meta | null {
   return cached;
 }
 
-export interface AisCheck { matched: number; stationary: number; moving: number; stationaryPct: number; movingPct: number }
+export interface AisCheck {
+  matched: number;
+  stationary: number;
+  /** Null when the data does not count them (built before ais_moving_on_posidonia existed). */
+  moving: number | null;
+  /** Confident matches without an AIS speed: neither stationary nor moving. */
+  noSpeed: number | null;
+  /** Share of all confident matches. */
+  stationaryPct: number;
+  movingPct: number | null;
+  /** Share of the matches with an AIS speed, the ones AIS can check. */
+  movingOfCheckedPct: number | null;
+}
 
-/** How many confident AIS matches anchored on Posidonia report a speed below the anchoring limit, over all months
- *  of timeseries.json. Null when the file is missing, has no AIS counts (older data) or counts no match at all. */
+/** How many confident AIS matches anchored on Posidonia report a speed below the anchoring limit, and how many one
+ *  at or above it, over all months of timeseries.json. Null when the file is missing, has no AIS counts (older
+ *  data) or counts no match at all. */
 export function readAisCheck(): AisCheck | null {
   let ts: Partial<Timeseries> | null;
   try {
@@ -39,7 +52,15 @@ export function readAisCheck(): AisCheck | null {
   if (matched <= 0) return null;
   const stationary = Math.min(sum(still), matched);
   const stationaryPct = Math.round((stationary / matched) * 100);
-  return { matched, stationary, moving: matched - stationary, stationaryPct, movingPct: 100 - stationaryPct };
+  // A match without an AIS speed is not stationary, but it is not known to be moving either
+  const mv = ts?.ais_moving_on_posidonia;
+  if (!Array.isArray(mv)) return { matched, stationary, moving: null, noSpeed: null, stationaryPct, movingPct: null, movingOfCheckedPct: null };
+  const moving = Math.min(sum(mv), matched - stationary);
+  return {
+    matched, stationary, moving, noSpeed: matched - stationary - moving, stationaryPct,
+    movingPct: Math.round((moving / matched) * 100),
+    movingOfCheckedPct: moving > 0 ? Math.round((moving / (stationary + moving)) * 100) : 0,
+  };
 }
 
 export const isFixture = (m: Meta | null) => !!m && String(m.methodology_version).includes('fixture');
