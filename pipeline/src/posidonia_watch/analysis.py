@@ -106,12 +106,24 @@ def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
 
 
 def dedupe(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop the same detection reported in two processing versions of a scene."""
+    """Drop the same detection reported in two processing versions of a scene.
+
+    Of the duplicates, the one with an AIS match and the highest match confidence is kept, so the AIS view of
+    a boat does not depend on which version comes first.
+    """
     key = (
         df["lat"].round(4).astype(str) + "," + df["lon"].round(4).astype(str) + ","
         + df["detect_timestamp"].astype(str).str.slice(0, 16)
-    )
-    return df.loc[~key.duplicated()]
+    ).to_numpy()
+    n = len(df)
+    matched = np.zeros(n, dtype=bool)
+    if "mmsi" in df:
+        matched = (df["mmsi"].notna() & (df["mmsi"].astype(str).str.strip() != "")).to_numpy()
+    conf = (_widened(df["matching_confidence"]) if "matching_confidence" in df else np.zeros(n))
+    order = np.lexsort((-np.nan_to_num(conf, nan=-1.0), ~matched))  # stable: matched, then most confident first
+    keep = np.zeros(n, dtype=bool)
+    keep[order[~pd.Series(key[order]).duplicated().to_numpy()]] = True
+    return df[keep]
 
 
 def points_within(lon, lat, polygons_metric: gpd.GeoDataFrame) -> np.ndarray:
