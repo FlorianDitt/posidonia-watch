@@ -246,6 +246,7 @@ def build(cfg: Config, since: str | None = None) -> dict:
     by_country = analysis.country_series(anch, months)
     hexes = analysis.aggregate_hexes(anch, cells[["h3", "country", "posidonia_km2"]], ovp, months)
     monthly_rows, monthly_clear = analysis.hex_monthly(anch, hexes["h3"].tolist(), ovp, months)
+    totals = totals.join(analysis.ais_monthly_totals(monthly_rows, months))
     hot = analysis.hotspots(hexes, cfg.output.get("hotspots_n", 50))
 
     out = cfg.out_dir

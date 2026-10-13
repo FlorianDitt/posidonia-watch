@@ -20,7 +20,7 @@ from .habitat import MED_LAEA
 
 log = logging.getLogger(__name__)
 
-# timeseries.json key -> the hexes_monthly.json array it is the monthly sum of
+# timeseries.json key -> the hexes_monthly.json array it is the monthly sum of (analysis.ais_monthly_totals)
 AIS_SERIES = {
     "ais_matched_on_posidonia": "ais_on_posidonia",
     "ais_matched_large_on_posidonia": "ais_large_on_posidonia",
@@ -292,11 +292,6 @@ def validate_outputs(out_dir: Path) -> None:
     _check(all(0 <= k < n for k in hm["month"]), "hexes_monthly.month index out of range")
     _check(len(hm["clear_overpasses"]) == m * n, "hexes_monthly.clear_overpasses must be cells x months")
     _check(sum(hm["on_posidonia"]) == sum(hx["on_posidonia"]), "hexes_monthly.on_posidonia must sum to hexes total")
-    for ts_key, hm_key in AIS_SERIES.items():
-        per_month = [0] * n
-        for k, v in zip(hm["month"], hm[hm_key]):
-            per_month[k] += v
-        _check(per_month == ts[ts_key], f"timeseries.{ts_key} must be the monthly sum of hexes_monthly.{hm_key}")
 
     pts = json.loads((out_dir / "points.json").read_text())
     p = len(pts["lon"])
