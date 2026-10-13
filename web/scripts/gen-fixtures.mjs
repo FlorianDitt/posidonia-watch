@@ -10,21 +10,15 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'dat
 mkdirSync(OUT, { recursive: true });
 
 // Deterministic PRNG (mulberry32)
-let seed = 20261006;
-const rand = () => {
+const prng = (seed) => () => {
   seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
+const rand = prng(20261006);
 // Separate stream for the AIS fields, so adding them left every other fixture value unchanged
-let aisSeed = 8675309;
-const aisRand = () => {
-  aisSeed |= 0; aisSeed = (aisSeed + 0x6d2b79f5) | 0;
-  let t = Math.imul(aisSeed ^ (aisSeed >>> 15), 1 | aisSeed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
+const aisRand = prng(8675309);
 const randn = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
 const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
 
