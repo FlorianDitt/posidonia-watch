@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import shapely
 
-from .analysis import AIS_COUNTS, SEASONS
+from .analysis import AIS_COUNTS, SEASONS, WIDENING_DECIMALS
 from .flags import flag_of
 from .habitat import MED_LAEA
 
@@ -44,7 +44,7 @@ def _floor(x, nd: int):
     The float32 widening error is rounded away first, as in ``analysis._widened`` (0.9 stays 0.9).
     """
     x = _num(x)
-    return None if x is None else math.floor(round(x * 10 ** nd, 6 - nd)) / 10 ** nd
+    return None if x is None else math.floor(round(x * 10 ** nd, WIDENING_DECIMALS - nd)) / 10 ** nd
 
 
 def write_json(path: Path, obj) -> None:

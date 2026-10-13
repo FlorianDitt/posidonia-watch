@@ -74,9 +74,13 @@ def anchored_mask(df: pd.DataFrame, params: dict, filters: dict) -> np.ndarray:
     return (speed < params["speed_kn_max"]) & quality_mask(df, filters)
 
 
+# Decimals that undo the float32 widening error (0.9 is stored as 0.89999998); shared with ``export._floor``
+WIDENING_DECIMALS = 6
+
+
 def _widened(col: pd.Series) -> np.ndarray:
-    """float32 cache column as float64 without the widening error (0.9 is stored as 0.89999998)."""
-    return np.round(pd.to_numeric(col, errors="coerce").to_numpy(dtype=float), 6)
+    """float32 cache column as float64 without the widening error."""
+    return np.round(pd.to_numeric(col, errors="coerce").to_numpy(dtype=float), WIDENING_DECIMALS)
 
 
 def ais_fields(df: pd.DataFrame, params: dict) -> pd.DataFrame:
