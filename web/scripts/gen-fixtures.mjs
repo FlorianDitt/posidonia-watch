@@ -91,6 +91,7 @@ const ts = {
   ais_matched_large_on_posidonia: months.map(() => 0),
   ais_stationary_on_posidonia: months.map(() => 0),
   ais_stationary_large_on_posidonia: months.map(() => 0),
+  ais_moving_on_posidonia: months.map(() => 0),
   by_country: {},
 };
 // Sparse (cell, month) rows plus dense clear overpasses, as in docs/data-contract.md
@@ -156,6 +157,8 @@ for (const [i, row] of rows.entries()) {
       cm[2]++;
       if (isLarge) { ts.ais_matched_large_on_posidonia[mi]++; cm[3]++; }
     }
+    // every fixture match has a speed, so a confident one is either stationary or moving
+    if (confident && !stationary) ts.ais_moving_on_posidonia[mi]++;
     if (stationary) {
       ts.ais_stationary_on_posidonia[mi]++;
       cm[4]++;
