@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from posidonia_watch import export, ingest, pipeline
+from posidonia_watch import cli, export, ingest, pipeline
 from posidonia_watch.config import Config, load_config
 from posidonia_watch.zenodo import Release
 
@@ -249,3 +249,14 @@ def test_ais_nesting_check_covers_the_large_counts():
                      ("large_on_posidonia", 6)):                 # more large boats than boats
         with pytest.raises(export.ContractError):
             export._check_ais_nesting({**row, key: [bad]})
+
+
+def test_update_since_builds_from_every_cached_release(monkeypatch):
+    builds = []
+    monkeypatch.setattr(cli, "load_config", lambda path: None)
+    monkeypatch.setattr(pipeline, "ensure_reference", lambda cfg: (None, None, None))
+    monkeypatch.setattr(pipeline, "discover", lambda cfg: {})
+    monkeypatch.setattr(pipeline, "load_manifest", lambda cfg: {})
+    monkeypatch.setattr(pipeline, "build", lambda cfg, **kw: builds.append(kw))
+    assert cli.main(["update", "--since", "2025"]) == 0
+    assert builds == [{}]  # no `since`: stale older releases stop the build instead of being left out
