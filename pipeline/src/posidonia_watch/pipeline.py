@@ -126,11 +126,20 @@ def fetch_release(cfg: Config, rel: zenodo.Release, cells: pd.DataFrame, force: 
         log.info("%s already cached (record %s)", rel.period, rel.record_id)
         return
     ovp_cells = overpass_cell_set(cells)
-    log.info("Fetching %s (record %s): detections %.0f MB, overpasses %.0f MB",
-             rel.period, rel.record_id, (rel.detections_size or 0) / 1e6, (rel.overpass_size or 0) / 1e6)
+    entry = manifest.get(rel.period) or {}
+    # A detection schema bump leaves the overpass file as it is: keep it instead of downloading it again
+    keep_ovp = (not force and entry.get("record_id") == rel.record_id and "overpass_rows" in entry
+                and (p["overpass"] / f"{rel.period}.parquet").exists())
+    log.info("Fetching %s (record %s): detections %.0f MB, overpasses %s",
+             rel.period, rel.record_id, (rel.detections_size or 0) / 1e6,
+             "cached" if keep_ovp else f"{(rel.overpass_size or 0) / 1e6:.0f} MB")
     n_det = ingest.fetch_detections(rel.detections_url, cfg.bbox, p["detections"] / f"{rel.period}.parquet")
-    n_ovp = ingest.fetch_overpasses(rel.overpass_url, ovp_cells, p["overpass"] / f"{rel.period}.parquet")
-    p["overpass_cells"].write_text(json.dumps(sorted(ovp_cells | set(_cached_overpass_cells(cfg)))))
+    if keep_ovp:
+        n_ovp, ovp_cells_n = entry["overpass_rows"], entry.get("overpass_cells", len(ovp_cells))
+    else:
+        n_ovp = ingest.fetch_overpasses(rel.overpass_url, ovp_cells, p["overpass"] / f"{rel.period}.parquet")
+        ovp_cells_n = len(ovp_cells)
+        p["overpass_cells"].write_text(json.dumps(sorted(ovp_cells | set(_cached_overpass_cells(cfg)))))
     manifest = load_manifest(cfg)
     manifest[rel.period] = {
         "record_id": rel.record_id,
@@ -142,7 +151,7 @@ def fetch_release(cfg: Config, rel: zenodo.Release, cells: pd.DataFrame, force: 
         "detections_schema": ingest.DETECTION_SCHEMA_VERSION,
         "detections_rows": n_det,
         "overpass_rows": n_ovp,
-        "overpass_cells": len(ovp_cells),
+        "overpass_cells": ovp_cells_n,
         "fetched_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     save_manifest(cfg, manifest)

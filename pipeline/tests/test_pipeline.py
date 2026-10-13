@@ -50,6 +50,26 @@ def test_is_cached_refetches_releases_cached_under_an_older_schema(tmp_path):
     assert not pipeline.is_cached(cfg, rel, legacy)
 
 
+def test_fetch_release_keeps_the_overpass_file_when_only_the_detection_schema_is_stale(tmp_path, monkeypatch):
+    cfg = Config(raw={"bbox": [0, 0, 1, 1]}, base_dir=tmp_path)
+    rel = _release("202501")
+    calls = []
+    monkeypatch.setattr(pipeline, "overpass_cell_set", lambda cells: {"a"})
+    monkeypatch.setattr(ingest, "fetch_detections", lambda *a: calls.append("det") or 5)
+    monkeypatch.setattr(ingest, "fetch_overpasses", lambda *a: calls.append("ovp") or 7)
+    for d in ("detections", "overpass"):
+        (cfg.cache_dir / d).mkdir(parents=True)
+        (cfg.cache_dir / d / "202501.parquet").touch()
+    pipeline.save_manifest(cfg, {"202501": {"record_id": rel.record_id, "overpass_rows": 9, "overpass_cells": 3}})
+    pipeline.fetch_release(cfg, rel, None)
+    assert calls == ["det"]
+    entry = pipeline.load_manifest(cfg)["202501"]
+    assert (entry["overpass_rows"], entry["overpass_cells"]) == (9, 3)
+    assert entry["detections_schema"] == ingest.DETECTION_SCHEMA_VERSION
+    pipeline.fetch_release(cfg, rel, None, force=True)  # --force downloads both again
+    assert calls == ["det", "det", "ovp"]
+
+
 def test_releases_to_fetch_skips_an_annual_release_superseded_by_monthly_ones(tmp_path):
     cfg = Config(raw={}, base_dir=tmp_path)
     year = {p: _release(p) for p in ("2024", "2025", *(f"2025{m:02d}" for m in range(1, 13)))}
