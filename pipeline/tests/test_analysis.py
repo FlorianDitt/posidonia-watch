@@ -88,6 +88,15 @@ def test_ais_fields_confirm_stationary_only_for_confident_matches_with_both_spee
     assert np.isnan(ais["ais_speed_kn"].iloc[3])  # no match: speed is not reported
 
 
+def test_ais_fields_keep_a_match_without_confidence_as_uncertain():
+    df = pd.DataFrame({"mmsi": ["227000009"], "matching_confidence": [np.nan],
+                       "ais_speed_kn_before": [0.1], "ais_speed_kn_after": [0.1]})
+    ais = analysis.ais_fields(df, {"ais_confidence_min": 0.9, "speed_kn_max": 1.0})
+    assert ais["ais_matched"].tolist() == [True]
+    assert ais["ais_confident"].tolist() == [False]
+    assert ais["ais_stationary"].tolist() == [False]
+
+
 def test_ais_fields_compare_float32_cache_values_at_their_decimal_value():
     df = pd.DataFrame({
         "mmsi": ["227000001", "227000002"],
