@@ -179,6 +179,10 @@ def _load_cached(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame, list[str], di
     manifest = load_manifest(cfg)
     periods = sorted(k for k in manifest if (p["detections"] / f"{k}.parquet").exists()
                      and (p["overpass"] / f"{k}.parquet").exists())
+    stale = [k for k in periods if manifest[k].get("detections_schema", 1) != ingest.DETECTION_SCHEMA_VERSION]
+    if stale:  # their missing columns would read as "no AIS match" and publish zero AIS counts for those months
+        raise SystemExit(f"Releases cached under an older detection schema: {', '.join(stale)}. "
+                         "Run `posidonia-watch update --no-build` (or `fetch --months ...`) to fetch them again.")
     monthly_months = {f"{k[:4]}-{k[4:]}" for k in periods if len(k) == 6}
     dets, ovps = [], []
     for k in periods:
@@ -193,9 +197,8 @@ def _load_cached(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame, list[str], di
             o = o[o["month"] == mon]
         dets.append(d)
         ovps.append(o)
-    # releases cached under an older schema lack the newer columns; they read as missing (NaN)
-    det = (pd.concat(dets, ignore_index=True) if dets else pd.DataFrame()).reindex(
-        columns=list(ingest.DETECTION_COLUMNS) + ["month"])
+    det = (pd.concat(dets, ignore_index=True) if dets
+           else pd.DataFrame(columns=list(ingest.DETECTION_COLUMNS) + ["month"]))
     ovp = pd.concat(ovps, ignore_index=True) if ovps else pd.DataFrame(columns=list(ingest.OVERPASS_COLUMNS))
     months = sorted(set(ovp["month"]) | set(det["month"]))
     return det, ovp, months, manifest
