@@ -22,8 +22,7 @@ type SeasonSel = 'ALL' | Season;
 type Boats = 'all' | 'ais' | 'ais_st';
 
 const MED_BBOX: [number, number, number, number] = [-6.0, 30.0, 36.5, 46.0];
-const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/positron';
-const STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
+const STYLE_URL = 'https://tiles.versatiles.org/assets/styles/colorful/style.json';
 const POSIDONIA_MINZOOM = 8;
 const POINTS_MINZOOM = 11;
 /** Below this zoom hexes are drawn as centroid dots. */
@@ -40,31 +39,47 @@ const METRIC_LABEL: Record<Metric, (largeLen: number) => string> = {
   density: () => 'Boats on seagrass per clear satellite image',
 };
 
-/** Fetch the basemap style; if OpenFreeMap is unreachable, fall back to a plain background so our data still renders. */
+/** Fetch the basemap style; if the tile server is unreachable, fall back to a plain background so our data still renders. */
 async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
-  const url = isDark() ? STYLE_DARK : STYLE_LIGHT;
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(STYLE_URL, { signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as maplibregl.StyleSpecification;
+    return withRelief((await res.json()) as maplibregl.StyleSpecification);
   } catch (e) {
     console.warn('Basemap unavailable, using plain background', e);
     return {
       version: 8,
       sources: {},
-      layers: [{ id: 'background', type: 'background', paint: { 'background-color': isDark() ? '#16252a' : '#dfe8ea' } }],
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#bfd9f2' } }],
     };
   }
 }
 
+/** VersaTiles draws OpenStreetMap land cover only from zoom 7-12, so zoomed out the land is plain off-white.
+ *  Natural Earth shaded relief (public domain, served by OpenFreeMap) fills it with green lowlands and brown
+ *  mountains, and fades out as the OSM land cover takes over. It sits right above the background so the
+ *  vector water stays on top. */
+function withRelief(style: maplibregl.StyleSpecification): maplibregl.StyleSpecification {
+  style.sources['ne2-relief'] = {
+    type: 'raster',
+    tiles: ['https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png'],
+    tileSize: 256,
+    maxzoom: 6,
+    attribution: '<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>',
+  };
+  const bg = style.layers.findIndex((l) => l.type === 'background');
+  style.layers.splice(bg + 1, 0, {
+    id: 'ne2-relief', type: 'raster', source: 'ne2-relief',
+    paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 6, 1, 8, 0.6, 10, 0] },
+  });
+  return style;
+}
+
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-const isDark = () =>
-  document.documentElement.dataset.theme === 'dark' || (document.documentElement.dataset.theme !== 'light' && darkQuery.matches);
 
 interface State {
   metric: Metric;
@@ -291,7 +306,7 @@ function ramp(): string[] {
   return [0, 1, 2, 3, 4].map((i) => cssVar(`--ramp-${i}`));
 }
 
-function zeroColor() { return isDark() ? 'rgba(180,195,192,0.18)' : 'rgba(68,87,92,0.12)'; }
+const ZERO_COLOR = 'rgba(68,87,92,0.12)';
 
 let currentBreaks: number[] = [];
 
@@ -307,8 +322,8 @@ function fillColorExpr(): ExpressionSpecification {
   currentBreaks.forEach((b, k) => step.push(b, pick(k + 1)));
   return [
     'case',
-    ['==', ['get', key], null], zeroColor(),
-    ['<=', ['to-number', ['get', key]], 0], zeroColor(),
+    ['==', ['get', key], null], ZERO_COLOR,
+    ['<=', ['to-number', ['get', key]], 0], ZERO_COLOR,
     step,
   ] as unknown as ExpressionSpecification;
 }
@@ -319,8 +334,9 @@ function dotPaint() {
   return {
     'circle-color': fillColorExpr(),
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, ['case', positive, 3, 1.5], DOTS_MAXZOOM, ['case', positive, 6, 3]],
-    'circle-stroke-color': cssVar('--hex-line'),
-    'circle-stroke-width': 0.5,
+    'circle-stroke-color': cssVar('--map-halo'),
+    // halo only on cells with boats: thousands of haloed empty cells wash out the coastal sea
+    'circle-stroke-width': ['case', positive, 1, 0],
     'circle-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
     'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], DOTS_MAXZOOM - 1, 1, DOTS_MAXZOOM, 0],
   } as unknown as NonNullable<maplibregl.CircleLayerSpecification['paint']>;
@@ -359,7 +375,7 @@ function renderLegend() {
   el.innerHTML = `
     <div class="h-3 rounded-sm" style="background:${bar}"></div>
     <div class="relative h-6">${ticks.join('')}</div>
-    <div class="mt-1 flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-sm border border-line" style="background:${zeroColor()}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`;
+    <div class="mt-1 flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-sm border border-line" style="background:${ZERO_COLOR}"></span><span>0${isCount ? '' : ' or no clear image'}</span></div>`;
   el.title = 'Classes are quantiles of non-zero cells';
 }
 
@@ -455,7 +471,7 @@ export async function initMap() {
       container: 'map',
       style: await basemapStyle(),
       bounds: [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
-      fitBoundsOptions: { padding: window.innerWidth >= 640 ? { top: 20, bottom: 20, left: 340, right: 20 } : { top: 10, bottom: 60, left: 10, right: 10 } },
+      fitBoundsOptions: { padding: window.innerWidth >= 640 ? { top: 20, bottom: 20, left: 370, right: 20 } : { top: 10, bottom: 60, left: 10, right: 10 } },
       attributionControl: false,
       maxZoom: 16,
       dragRotate: false,
@@ -501,12 +517,12 @@ export async function initMap() {
     if (!map.getLayer('posidonia-fill')) {
       map.addLayer({
         id: 'posidonia-fill', type: 'fill', source: 'posidonia', minzoom: POSIDONIA_MINZOOM,
-        paint: { 'fill-color': cssVar('--seagrass'), 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.18, 12, 0.32] },
+        paint: { 'fill-color': cssVar('--map-seagrass'), 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.18, 12, 0.32] },
         layout: { visibility: state.showPosidonia ? 'visible' : 'none' },
       }, before);
       map.addLayer({
         id: 'posidonia-line', type: 'line', source: 'posidonia', minzoom: POSIDONIA_MINZOOM,
-        paint: { 'line-color': cssVar('--seagrass'), 'line-width': 0.8, 'line-opacity': 0.7 },
+        paint: { 'line-color': cssVar('--map-seagrass'), 'line-width': 0.8, 'line-opacity': 0.7 },
         layout: { visibility: state.showPosidonia ? 'visible' : 'none' },
       }, before);
     }
@@ -524,7 +540,7 @@ export async function initMap() {
       map.addLayer({
         id: 'hex-line', type: 'line', source: 'hexes',
         paint: {
-          'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], cssVar('--ink'), cssVar('--hex-line')],
+          'line-color': ['case', ['boolean', ['feature-state', 'hover'], false], cssVar('--map-ink'), cssVar('--hex-line')],
           'line-width': ['interpolate', ['linear'], ['zoom'],
             5, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0],
             8, ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0.5],
@@ -552,7 +568,7 @@ export async function initMap() {
             11, ['interpolate', ['linear'], ['get', 'L'], 8, 2, largeLen, 3.5, 60, 6],
             15, ['interpolate', ['linear'], ['get', 'L'], 8, 4, largeLen, 7, 60, 12]],
           // confident AIS matches get a dark ring
-          'circle-stroke-color': ['case', ['==', ['get', 'a'], 1], cssVar('--ink'), cssVar('--surface')],
+          'circle-stroke-color': ['case', ['==', ['get', 'a'], 1], cssVar('--map-ink'), cssVar('--map-halo')],
           'circle-stroke-width': ['case', ['==', ['get', 'a'], 1], 2, 1],
           'circle-opacity': 0.9,
         },
@@ -640,16 +656,6 @@ export async function initMap() {
     console.warn('map error', e?.error ?? e);
   });
   map.on('moveend', () => { ensurePosidonia(); ensurePoints(); });
-
-  // swapping the basemap drops our layers; style.load re-adds them in the new palette
-  let dark = isDark();
-  const onTheme = async () => {
-    if (isDark() === dark) return;
-    dark = isDark();
-    map.setStyle(await basemapStyle(), { diff: false });
-  };
-  darkQuery.addEventListener('change', onTheme);
-  window.addEventListener('themechange', onTheme);
 
   let hoveredId: number | null = null;
   const canHover = window.matchMedia('(hover: hover)').matches;
