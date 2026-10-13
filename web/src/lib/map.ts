@@ -388,8 +388,8 @@ type AisProps = { a?: number; st?: number; ac?: number | null; as?: number | nul
 /** AIS block of the boat popup. Only confident matches name a flag, so an uncertain match never pins a country on a boat. */
 function aisPopupHtml(p: AisProps): string {
   if (p.a == null) return ''; // data without AIS: unknown, which is not "no match"
-  if (p.ac == null) return '<div class="mt-1 border-t border-line pt-1 text-muted">No AIS match</div>';
-  if (!p.a) return `<div class="mt-1 border-t border-line pt-1 text-muted">Uncertain AIS match (confidence ${fmtNum(p.ac, 2)})</div>`;
+  if (p.st == null) return '<div class="mt-1 border-t border-line pt-1 text-muted">No AIS match</div>'; // st is set for matches only
+  if (!p.a) return `<div class="mt-1 border-t border-line pt-1 text-muted">Uncertain AIS match${p.ac != null ? ` (confidence ${fmtNum(p.ac, 2)})` : ''}</div>`;
   const flag = p.af ? `<div><span class="text-base leading-none">${flagEmoji(p.af)}</span> ${escapeHtml(flagName(p.af))} flag</div>` : '';
   const facts = [p.al != null ? `${fmtNum(p.al, 1)} m` : null, p.as != null ? `${fmtNum(p.as, 1)} kn` : null].filter(Boolean).join(' · ');
   const moving = p.as != null && !p.st
