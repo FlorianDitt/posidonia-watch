@@ -22,7 +22,7 @@ type SeasonSel = 'ALL' | Season;
 type Boats = 'all' | 'ais' | 'ais_st';
 
 const MED_BBOX: [number, number, number, number] = [-6.0, 30.0, 36.5, 46.0];
-const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const STYLE_URL = 'https://tiles.versatiles.org/assets/styles/colorful/style.json';
 const POSIDONIA_MINZOOM = 8;
 const POINTS_MINZOOM = 11;
 /** Below this zoom hexes are drawn as centroid dots. */
@@ -39,7 +39,7 @@ const METRIC_LABEL: Record<Metric, (largeLen: number) => string> = {
   density: () => 'Boats on seagrass per clear satellite image',
 };
 
-/** Fetch the basemap style; if OpenFreeMap is unreachable, fall back to a plain background so our data still renders. */
+/** Fetch the basemap style; if the tile server is unreachable, fall back to a plain background so our data still renders. */
 async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
   try {
     const ctrl = new AbortController();
@@ -47,33 +47,34 @@ async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
     const res = await fetch(STYLE_URL, { signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return calmBasemap((await res.json()) as maplibregl.StyleSpecification);
+    return withRelief((await res.json()) as maplibregl.StyleSpecification);
   } catch (e) {
     console.warn('Basemap unavailable, using plain background', e);
     return {
       version: 8,
       sources: {},
-      layers: [{ id: 'background', type: 'background', paint: { 'background-color': BASEMAP.water } }],
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#bfd9f2' } }],
     };
   }
 }
 
-/** Basemap colors replacing liberty's saturated periwinkle water and green-brown relief, so the orange hexagons
- *  stand out against a muted sea and a neutral land. */
-const BASEMAP = { land: '#f3f0ea', water: '#b4d0e1', waterLabel: '#3d6680' };
-
-function calmBasemap(style: maplibregl.StyleSpecification): maplibregl.StyleSpecification {
-  for (const l of style.layers) {
-    const paint = ((l as { paint?: Record<string, unknown> }).paint ??= {});
-    if (l.id === 'background') paint['background-color'] = BASEMAP.land;
-    else if (l.id === 'water') paint['fill-color'] = BASEMAP.water;
-    else if (l.id.startsWith('waterway') && l.type === 'line') paint['line-color'] = BASEMAP.water;
-    else if (l.id.startsWith('water_name')) paint['text-color'] = BASEMAP.waterLabel;
-    else if (l.type === 'raster') {
-      paint['raster-saturation'] = -0.6;
-      paint['raster-opacity'] = ['interpolate', ['linear'], ['zoom'], 0, 0.3, 6, 0.05];
-    }
-  }
+/** VersaTiles draws OpenStreetMap land cover only from zoom 7-12, so zoomed out the land is plain off-white.
+ *  Natural Earth shaded relief (public domain, served by OpenFreeMap) fills it with green lowlands and brown
+ *  mountains, and fades out as the OSM land cover takes over. It sits right above the background so the
+ *  vector water stays on top. */
+function withRelief(style: maplibregl.StyleSpecification): maplibregl.StyleSpecification {
+  style.sources['ne2-relief'] = {
+    type: 'raster',
+    tiles: ['https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png'],
+    tileSize: 256,
+    maxzoom: 6,
+    attribution: '<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>',
+  };
+  const bg = style.layers.findIndex((l) => l.type === 'background');
+  style.layers.splice(bg + 1, 0, {
+    id: 'ne2-relief', type: 'raster', source: 'ne2-relief',
+    paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 6, 1, 8, 0.6, 10, 0] },
+  });
   return style;
 }
 
