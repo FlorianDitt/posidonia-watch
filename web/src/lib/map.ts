@@ -99,6 +99,9 @@ let largeLen = 24;
 let aisConfMin: number | null = null;
 /** hexes_monthly and timeseries both carry every AIS count the Boats choices need (older data does not). */
 let aisAvailable = false;
+/** Whether the loaded points.json carries the AIS class of every boat (it is fetched late and may be an older
+ *  file than the counts); null until it has loaded. */
+let pointsHaveAis: boolean | null = null;
 
 function setStatus(msg: string | null) {
   const el = $('map-status');
@@ -565,8 +568,11 @@ export async function initMap() {
     if (sel !== null) conds.push(['in', ['get', 'm'], ['literal', sel]]);
     if (!state.showSmall) conds.push(['>=', ['get', 'L'], largeLen]);
     if (!state.showLarge) conds.push(['<', ['get', 'L'], largeLen]);
-    if (state.boats === 'ais') conds.push(['==', ['get', 'a'], 1]);
-    if (state.boats === 'ais_st') conds.push(['==', ['get', 'st'], 1]);
+    // points without the AIS class cannot be told apart, so they all stay instead of all vanishing
+    if (pointsHaveAis !== false) {
+      if (state.boats === 'ais') conds.push(['==', ['get', 'a'], 1]);
+      if (state.boats === 'ais_st') conds.push(['==', ['get', 'st'], 1]);
+    }
     map.setFilter('points', conds.length ? (['all', ...conds] as ExpressionSpecification) : null);
   }
 
@@ -604,7 +610,16 @@ export async function initMap() {
     pointsLoading = true;
     const p = await loadJson<Points>('points.json');
     pointsGeojson = p ? buildPointsGeojson(p) : { type: 'FeatureCollection', features: [] };
+    // a Boats choice may already be active: drop its filter if these points cannot follow it, and say so
+    pointsHaveAis = pointsGeojson.features.length === 0 || (p?.ais_class?.length ?? 0) >= pointsGeojson.features.length;
+    applyPointFilter();
+    renderBoatsPointsNote();
     (map.getSource('points') as GeoJSONSource | undefined)?.setData(pointsGeojson);
+  }
+
+  /** Tell when the hexagons and month bars follow an AIS choice that the single boats cannot follow. */
+  function renderBoatsPointsNote() {
+    $('boats-points-note').hidden = pointsHaveAis !== false || state.boats === 'all';
   }
 
   map.on('style.load', () => {
@@ -767,6 +782,7 @@ export async function initMap() {
       : year === 'ALL' ? `${SEASON_LABEL[state.season].split(' ')[0]} only` : `${when}, ${seasonWord(state.season)} only`;
     $('time-reset').hidden = state.range === null;
     $('sum-boats').textContent = BOATS_LABEL[state.boats];
+    renderBoatsPointsNote();
   }
 
   /** Re-render everything that depends on metric, range or season. */
