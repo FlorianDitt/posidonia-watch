@@ -114,9 +114,12 @@ const sentinelYears = years.length > 1 ? `${years[0]}–${years[years.length - 1
         <>
           Of the {fmtInt(ais.matched)} confidently matched boats counted as anchored on Posidonia in this release,{' '}
           {fmtInt(ais.stationary)} ({ais.stationaryPct} %) reported less than {p.speed_kn_max} kn.{' '}
-          {ais.moving > 0
-            ? `The other ${fmtInt(ais.moving)} reported ${p.speed_kn_max} kn or more: they were under way when the image was taken, and the image-based speed misses that.`
-            : `None reported ${p.speed_kn_max} kn or more.`}
+          {ais.moving === null
+            ? `A matched boat that reports ${p.speed_kn_max} kn or more was under way when the image was taken, and the image-based speed misses that.`
+            : ais.moving > 0
+              ? `${fmtInt(ais.moving)} (${ais.movingPct} %) reported ${p.speed_kn_max} kn or more: they were under way when the image was taken, and the image-based speed misses that.`
+              : `None reported ${p.speed_kn_max} kn or more.`}
+          {ais.noSpeed ? ` For the other ${fmtInt(ais.noSpeed)}, AIS gives no speed.` : null}
         </>
       ) : (
         <>A matched boat that reports {p.speed_kn_max} kn or more was under way when the image was taken, and the image-based speed misses that.</>
@@ -134,7 +137,7 @@ const sentinelYears = years.length > 1 ? `${years[0]}–${years[years.length - 1
       <li><strong>Small boats are missed.</strong> With 10 m pixels, vessels shorter than roughly 10–15 m are detected unreliably or not at all. Most leisure boats are in that range, so the true number of anchored boats is much higher than shown.</li>
       <li><strong>Moorings look like anchoring.</strong> A boat on a legal, eco-designed mooring buoy above a meadow looks the same from space as one dropping an anchor into it.</li>
       <li><strong>Pressure, not proof.</strong> Detections are indicators of anchoring pressure, not evidence that any individual skipper broke a rule. Do not use this map to accuse individual vessels.</li>
-      <li><strong>Speed is inferred.</strong> Speed is estimated from the image (e.g. wakes), so moving boats may be counted as anchored and vice versa. {!ais || ais.moving === 0 ? null : <>Where AIS can check it, {ais && ais.movingPct >= 1 ? `${ais.movingPct} % of` : 'some'} “anchored” boats were moving (see <a href="#ais">AIS matches</a>).</>}</li>
+      <li><strong>Speed is inferred.</strong> Speed is estimated from the image (e.g. wakes), so moving boats may be counted as anchored and vice versa. {!ais?.moving ? null : <>Where AIS can check it, {ais.movingOfCheckedPct! >= 1 ? `${ais.movingOfCheckedPct} % of` : 'some'} “anchored” boats were moving (see <a href="#ais">AIS matches</a>).</>}</li>
       <li><strong>Seagrass maps are incomplete.</strong> EMODnet combines many surveys of different ages and precision; unmapped meadows are invisible here, and some polygons may include sand patches or dead matte.</li>
       <li><strong>Snapshot sampling.</strong> Sentinel-2 passes every few days at around 10:30–11:00 local time; boats anchoring only overnight or in the afternoon are under-sampled.</li>
     </ul>

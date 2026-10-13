@@ -42,6 +42,8 @@ export interface Timeseries {
   ais_matched_large_on_posidonia?: number[];
   ais_stationary_on_posidonia?: number[];
   ais_stationary_large_on_posidonia?: number[];
+  /** Confident AIS matches whose AIS speed is known and not below the anchoring limit; missing in older data. */
+  ais_moving_on_posidonia?: number[];
   by_country: Record<string, CountrySeries>;
 }
 
