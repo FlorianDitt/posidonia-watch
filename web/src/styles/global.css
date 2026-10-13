@@ -37,22 +37,6 @@
   --point-large: #c0265e;
 }
 
-/* Light chrome for controls floating over the pale basemap: a navy slab there was the loudest thing
-   on screen (~15:1 against the land) while the ramp's dark end sank into it. Text stays >= 4.5:1. */
-.map-light {
-  color-scheme: light;
-  --bg: #ece8e0;
-  --surface: #fbfaf7;
-  --surface-2: #f3f0ea;
-  --ink: #10232a;
-  --ink-2: #34424f;
-  --muted: #5a6878;
-  --line: #d6d0c5;
-  --sea: #1b5e7a;
-  --focus: #1b5e7a;
-  color: var(--ink);
-}
-
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
