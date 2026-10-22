@@ -23,6 +23,8 @@ type Boats = 'all' | 'ais' | 'ais_st';
 
 const MED_BBOX: [number, number, number, number] = [-6.0, 30.0, 36.5, 46.0];
 const STYLE_URL = 'https://tiles.versatiles.org/assets/styles/colorful/style.json';
+/** Basemap colors laid over the VersaTiles style: a pale seagrass-green sea and warm grey land. */
+const BASEMAP = { land: '#eceae4', green: '#e2e4da', water: '#cfe5dc', waterLabel: '#3f6f62', border: '#b9b4a8' };
 const POSIDONIA_MINZOOM = 8;
 const POINTS_MINZOOM = 11;
 /** Below this zoom hexes are drawn as centroid dots. */
@@ -47,34 +49,32 @@ async function basemapStyle(): Promise<maplibregl.StyleSpecification | string> {
     const res = await fetch(STYLE_URL, { signal: ctrl.signal });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return withRelief((await res.json()) as maplibregl.StyleSpecification);
+    return recolor((await res.json()) as maplibregl.StyleSpecification);
   } catch (e) {
     console.warn('Basemap unavailable, using plain background', e);
     return {
       version: 8,
       sources: {},
-      layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#bfd9f2' } }],
+      layers: [{ id: 'background', type: 'background', paint: { 'background-color': BASEMAP.water } }],
     };
   }
 }
 
-/** VersaTiles draws OpenStreetMap land cover only from zoom 7-12, so zoomed out the land is plain off-white.
- *  Natural Earth shaded relief (public domain, served by OpenFreeMap) fills it with green lowlands and brown
- *  mountains, and fades out as the OSM land cover takes over. It sits right above the background so the
- *  vector water stays on top. */
-function withRelief(style: maplibregl.StyleSpecification): maplibregl.StyleSpecification {
-  style.sources['ne2-relief'] = {
-    type: 'raster',
-    tiles: ['https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png'],
-    tileSize: 256,
-    maxzoom: 6,
-    attribution: '<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>',
-  };
-  const bg = style.layers.findIndex((l) => l.type === 'background');
-  style.layers.splice(bg + 1, 0, {
-    id: 'ne2-relief', type: 'raster', source: 'ne2-relief',
-    paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 6, 1, 8, 0.6, 10, 0] },
-  });
+/** Paint land, vegetation, water, sea labels and borders in the BASEMAP colors; everything else keeps the VersaTiles style. */
+function recolor(style: maplibregl.StyleSpecification): maplibregl.StyleSpecification {
+  const p = BASEMAP;
+  const greens = /^land-(forest|grass|park|garden|vegetation|agriculture|wetland|leisure)$/;
+  for (const l of style.layers) {
+    if (l.id === 'background' && l.type === 'background') l.paint = { ...l.paint, 'background-color': p.land };
+    else if (l.type === 'fill' && greens.test(l.id)) l.paint = { ...l.paint, 'fill-color': p.green };
+    else if (l.type === 'fill' && /^water-(ocean|area)/.test(l.id)) l.paint = { ...l.paint, 'fill-color': p.water };
+    else if (l.type === 'fill' && /^water-(dam|pier)-area$/.test(l.id)) l.paint = { ...l.paint, 'fill-color': p.land };
+    else if (l.type === 'line' && /^water-(river|canal|stream|ditch)/.test(l.id)) l.paint = { ...l.paint, 'line-color': p.water };
+    else if (l.type === 'symbol' && /^label-water-/.test(l.id)) l.paint = { ...l.paint, 'text-color': p.waterLabel };
+    else if (l.type === 'line' && /^boundary-(country|state)/.test(l.id) && !l.id.endsWith(':outline')) {
+      l.paint = { ...l.paint, 'line-color': p.border };
+    }
+  }
   return style;
 }
 
